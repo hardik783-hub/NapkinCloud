@@ -15,6 +15,7 @@ import {
   type Connection,
   type Edge,
   type NodeTypes,
+  type Node,
 } from '@xyflow/react';
 import ApiGatewayNode from './nodes/ApiGatewayNode';
 import LambdaNode from './nodes/LambdaNode';
@@ -22,7 +23,9 @@ import DynamoDbNode from './nodes/DynamoDbNode';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import CompilationModal from './CompilationModal';
-import type { AppNode, AppEdge, NodeStatus } from '@/types/canvas';
+import ApiTesterDrawer from './drawers/ApiTesterDrawer';
+import DynamoDbDrawer from './drawers/DynamoDbDrawer';
+import type { AppNode, AppEdge, NodeStatus, ApiGatewayNodeData, DynamoDbNodeData } from '@/types/canvas';
 import type { CompileResponse } from '@/types/compiler';
 
 const initialNodes: AppNode[] = [
@@ -88,7 +91,11 @@ function CanvasInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initialEdges);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const [compilationResult, setCompilationResult] = useState<CompileResponse | null>(null);
+  const [activeDrawer, setActiveDrawer] = useState<'none' | 'api' | 'dynamodb'>('none');
+  const [refreshDbTrigger, setRefreshDbTrigger] = useState(0);
+
   const { screenToFlowPosition } = useReactFlow();
 
   const nodeTypes: NodeTypes = useMemo(
@@ -101,18 +108,24 @@ function CanvasInner() {
   );
 
   const setAllNodeStatuses = useCallback(
-    (status: NodeStatus) => {
+    (status: NodeStatus, metadata?: { liveUrl?: string; lambdaArn?: string; tableArn?: string }) => {
       setNodes((nds) =>
-        nds.map(
-          (node) =>
-            ({
-              ...node,
-              data: {
-                ...node.data,
-                status,
-              },
-            } as AppNode)
-        )
+        nds.map((node) => {
+          let extra: Record<string, any> = {};
+          if (status === 'live' && metadata) {
+            if (node.type === 'api_gateway') extra.liveUrl = metadata.liveUrl;
+            if (node.type === 'lambda') extra.arn = metadata.lambdaArn;
+            if (node.type === 'dynamodb') extra.arn = metadata.tableArn;
+          }
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              status,
+              ...extra,
+            },
+          } as AppNode;
+        })
       );
     },
     [setNodes]
@@ -192,7 +205,7 @@ function CanvasInner() {
             label: 'API Gateway',
             method: 'POST',
             path: `/service-${currentCount}`,
-            status: 'draft',
+            status: isLive ? 'live' : 'draft',
           },
         };
       } else if (nodeType === 'lambda') {
@@ -205,7 +218,7 @@ function CanvasInner() {
             functionName: `ServiceFunction${currentCount}`,
             runtime: 'nodejs20.x',
             businessLogic: 'Processes request payload and updates database',
-            status: 'draft',
+            status: isLive ? 'live' : 'draft',
           },
         };
       } else if (nodeType === 'dynamodb') {
@@ -217,7 +230,7 @@ function CanvasInner() {
             label: 'DynamoDB',
             tableName: `Table_${currentCount}`,
             primaryKey: 'id',
-            status: 'draft',
+            status: isLive ? 'live' : 'draft',
           },
         };
       } else {
@@ -226,7 +239,7 @@ function CanvasInner() {
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [screenToFlowPosition, setNodes]
+    [isLive, screenToFlowPosition, setNodes]
   );
 
   const handleCompile = async () => {
@@ -246,8 +259,19 @@ function CanvasInner() {
         throw new Error(data.validation?.errors?.join('\n') || 'Compilation failed.');
       }
 
-      setAllNodeStatuses('deploying');
       setCompilationResult(data);
+
+      // Deployment state transition: deploying -> live
+      setAllNodeStatuses('deploying');
+
+      setTimeout(() => {
+        const liveUrl = `https://${data.projectId}.execute-api.us-east-1.amazonaws.com/prod/orders`;
+        const lambdaArn = `arn:aws:lambda:us-east-1:123456789012:function:${data.projectId}-CreateOrder`;
+        const tableArn = `arn:aws:dynamodb:us-east-1:123456789012:table/${data.projectId}-Orders`;
+
+        setAllNodeStatuses('live', { liveUrl, lambdaArn, tableArn });
+        setIsLive(true);
+      }, 3000);
     } catch (err: any) {
       alert(`⚠️ [Compilation Error]\n${err.message}`);
       setAllNodeStatuses('draft');
@@ -256,13 +280,40 @@ function CanvasInner() {
     }
   };
 
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const appNode = node as AppNode;
+      if (appNode.data.status === 'live') {
+        if (appNode.type === 'api_gateway') {
+          setActiveDrawer('api');
+        } else if (appNode.type === 'dynamodb') {
+          setActiveDrawer('dynamodb');
+        }
+      } else {
+        alert('⚡ Click "Compile to AWS" first to deploy and activate live testing on this node!');
+      }
+    },
+    []
+  );
+
+  const handleRequestSuccess = (record: any) => {
+    console.log('[NapkinCloud] Real-time write captured:', record);
+    setRefreshDbTrigger((prev) => prev + 1);
+  };
+
+  const apiNode = nodes.find((n) => n.type === 'api_gateway') as AppNode | undefined;
+  const dynamoNode = nodes.find((n) => n.type === 'dynamodb') as AppNode | undefined;
+
   return (
     <div ref={reactFlowWrapper} className="w-screen h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
       <TopBar
         nodes={nodes}
         edges={edges}
         isCompiling={isCompiling}
+        isLive={isLive}
         onCompile={handleCompile}
+        onOpenApiDrawer={() => setActiveDrawer('api')}
+        onOpenDbDrawer={() => setActiveDrawer('dynamodb')}
       />
       <Sidebar />
 
@@ -274,6 +325,7 @@ function CanvasInner() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeClick={onNodeClick}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         fitView
@@ -289,10 +341,31 @@ function CanvasInner() {
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
 
+      {/* Compilation Result Modal */}
       {compilationResult && (
         <CompilationModal
           data={compilationResult}
           onClose={() => setCompilationResult(null)}
+        />
+      )}
+
+      {/* Live In-Canvas API Tester Drawer */}
+      {activeDrawer === 'api' && apiNode && (
+        <ApiTesterDrawer
+          apiData={apiNode.data as ApiGatewayNodeData}
+          tableName={(dynamoNode?.data as DynamoDbNodeData)?.tableName || 'OrdersTable'}
+          primaryKey={(dynamoNode?.data as DynamoDbNodeData)?.primaryKey || 'orderId'}
+          onClose={() => setActiveDrawer('none')}
+          onRequestSuccess={handleRequestSuccess}
+        />
+      )}
+
+      {/* Live In-Canvas DynamoDB Inspector Drawer */}
+      {activeDrawer === 'dynamodb' && dynamoNode && (
+        <DynamoDbDrawer
+          dbData={dynamoNode.data as DynamoDbNodeData}
+          onClose={() => setActiveDrawer('none')}
+          refreshTrigger={refreshDbTrigger}
         />
       )}
     </div>

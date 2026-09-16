@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Zap, Download, Play, Check, X, FileJson, ShieldCheck, Loader2 } from 'lucide-react';
+import { Zap, Download, Play, Check, X, FileJson, ShieldCheck, Loader2, Activity } from 'lucide-react';
 import { exportGraphToJson, type ExportedGraph } from '@/lib/graphExporter';
 import type { AppNode, AppEdge } from '@/types/canvas';
 
@@ -9,10 +9,21 @@ interface TopBarProps {
   nodes: AppNode[];
   edges: AppEdge[];
   isCompiling?: boolean;
+  isLive?: boolean;
   onCompile?: () => void;
+  onOpenApiDrawer?: () => void;
+  onOpenDbDrawer?: () => void;
 }
 
-export default function TopBar({ nodes, edges, isCompiling, onCompile }: TopBarProps) {
+export default function TopBar({
+  nodes,
+  edges,
+  isCompiling,
+  isLive,
+  onCompile,
+  onOpenApiDrawer,
+  onOpenDbDrawer,
+}: TopBarProps) {
   const [jsonModalOpen, setJsonModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [exportedData, setExportedData] = useState<ExportedGraph | null>(null);
@@ -55,22 +66,45 @@ export default function TopBar({ nodes, edges, isCompiling, onCompile }: TopBarP
           </div>
         </div>
 
-        {/* Center: Architecture Health Badge */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-mono">
-          <ShieldCheck
-            className={`w-4 h-4 ${
-              validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
-            }`}
-          />
-          <span className="text-slate-300">P0 Architecture:</span>
-          <span
-            className={`font-semibold ${
-              validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
-            }`}
-          >
-            {validation.isValidP0 ? 'Ready for AWS' : 'Needs Connections'}
-          </span>
-        </div>
+        {/* Center: Live Control Surface Status Badge */}
+        {isLive ? (
+          <div className="flex items-center gap-3 bg-emerald-950/50 backdrop-blur-md border border-emerald-500/40 px-4 py-2 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.25)] text-xs font-mono">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>🟢 Live Control Surface Active</span>
+            </div>
+            <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-emerald-800/60">
+              <button
+                onClick={onOpenApiDrawer}
+                className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 text-[11px] transition"
+              >
+                Test API
+              </button>
+              <button
+                onClick={onOpenDbDrawer}
+                className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-[11px] transition"
+              >
+                Inspect DB
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="hidden md:flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-mono">
+            <ShieldCheck
+              className={`w-4 h-4 ${
+                validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            />
+            <span className="text-slate-300">P0 Architecture:</span>
+            <span
+              className={`font-semibold ${
+                validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            >
+              {validation.isValidP0 ? 'Ready for AWS' : 'Needs Connections'}
+            </span>
+          </div>
+        )}
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 p-1.5 rounded-2xl shadow-2xl">
@@ -88,6 +122,8 @@ export default function TopBar({ nodes, edges, isCompiling, onCompile }: TopBarP
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               isCompiling
                 ? 'bg-amber-500/50 text-slate-950 cursor-wait animate-pulse'
+                : isLive
+                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
                 : 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 hover:brightness-110 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.35)]'
             }`}
           >
@@ -95,6 +131,11 @@ export default function TopBar({ nodes, edges, isCompiling, onCompile }: TopBarP
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                 <span>Compiling...</span>
+              </>
+            ) : isLive ? (
+              <>
+                <Activity className="w-4 h-4 text-slate-950" />
+                <span>🟢 Re-Deploy</span>
               </>
             ) : (
               <>
