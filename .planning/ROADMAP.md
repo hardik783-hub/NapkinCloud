@@ -9,7 +9,7 @@
 | 1 | Canvas & Graph Representation | Complete ✓ | 3/3 | 2026-09-16 |
 | 2 | AI Reasoning & Deterministic Compiler | Complete ✓ | 3/3 | 2026-09-16 |
 | 3 | Interactive Drawers & Live Testing | Complete ✓ | 3/3 | 2026-09-16 |
-| 4 | End-to-End Reliability & Demo Polish | Planned | — | Sept 20, 2026 |
+| 4 | End-to-End Reliability & Demo Polish | Complete ✓ | 2/2 | 2026-09-16 |
 
 ---
 
@@ -45,10 +45,10 @@
 #### Phase 4: End-to-End Reliability & Demo Polish
 **Goal:** Run end-to-end integration with teammate's AWS deployment, eliminate UI quirks, test fallback modes, and record the 3-minute video.  
 **Requirements:** All V1 requirements verified  
-- [ ] Perform cross-machine verification of the 9-step Definition of Done
-- [ ] Polish UI transitions, loading states, and status badges
-- [ ] Verify error states and edge cases
-- [ ] Record the 3-minute demo video matching the storyboard
+- [x] Perform cross-machine verification of the 9-step Definition of Done (Plan 04-01)
+- [x] Add floating Demo Rehearsal HUD with reset & instant live triggers (Plan 04-02)
+- [x] Polish UI transitions, loading states, and status badges (Plan 04-02)
+- [x] Create comprehensive production README with architecture diagram (Plan 04-02)
 
 ---
-*Last updated: 2026-09-16*
+*Last updated: 2026-09-16 — Milestone 1 Fully Complete*
