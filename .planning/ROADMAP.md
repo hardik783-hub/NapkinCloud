@@ -7,7 +7,7 @@
 | Phase | Name | Status | Plans | Target Date |
 |-------|------|--------|-------|-------------|
 | 1 | Canvas & Graph Representation | Complete ✓ | 3/3 | 2026-09-16 |
-| 2 | AI Reasoning & Deterministic Compiler | Planned | — | Sept 18, 2026 |
+| 2 | AI Reasoning & Deterministic Compiler | Complete ✓ | 3/3 | 2026-09-16 |
 | 3 | Interactive Drawers & Live Testing | Planned | — | Sept 19, 2026 |
 | 4 | End-to-End Reliability & Demo Polish | Planned | — | Sept 20, 2026 |
 
@@ -27,11 +27,12 @@
 #### Phase 2: AI Reasoning & Deterministic Compiler
 **Goal:** Build the backend pipeline that validates the graph, normalizes intent with Amazon Bedrock (Claude 3.5 Sonnet), and deterministically generates tested `template.yaml` and `handler.js`.  
 **Requirements:** R05, R06, R07, R08, R09  
-- [ ] Implement topology validator to enforce P0 architecture
-- [ ] Integrate Bedrock API client with strict structured JSON schema
-- [ ] Build deterministic SAM compiler with slot-injection for API routes, Lambda, and DynamoDB
-- [ ] Build Lambda handler code synthesizer pre-wired to DynamoDB DocumentClient
-- [ ] Implement fallback template injection for offline/zero-fail guarantee
+- [x] Implement topology validator to enforce P0 architecture (Plan 02-01)
+- [x] Integrate Bedrock API client with strict structured JSON schema (Plan 02-01)
+- [x] Build deterministic SAM compiler with slot-injection for API routes, Lambda, and DynamoDB (Plan 02-02)
+- [x] Build Lambda handler code synthesizer pre-wired to DynamoDB DocumentClient (Plan 02-02)
+- [x] Implement fallback template injection for offline/zero-fail guarantee (Plan 02-02)
+- [x] Connect Next.js `/api/compile` route with modal & canvas trigger (Plan 02-03)
 
 #### Phase 3: Interactive Drawers & Live Testing
 **Goal:** Turn the canvas into an active control surface once deployed, featuring live node statuses, the slide-out API tester drawer, and the live DynamoDB inspector.  
