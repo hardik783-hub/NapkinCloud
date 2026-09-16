@@ -23,6 +23,7 @@ import DynamoDbNode from './nodes/DynamoDbNode';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import CompilationModal from './CompilationModal';
+import DemoHelperHud from './DemoHelperHud';
 import ApiTesterDrawer from './drawers/ApiTesterDrawer';
 import DynamoDbDrawer from './drawers/DynamoDbDrawer';
 import type { AppNode, AppEdge, NodeStatus, ApiGatewayNodeData, DynamoDbNodeData } from '@/types/canvas';
@@ -130,6 +131,23 @@ function CanvasInner() {
     },
     [setNodes]
   );
+
+  const handleResetCanvas = useCallback(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    setIsLive(false);
+    setActiveDrawer('none');
+    setCompilationResult(null);
+  }, [setEdges, setNodes]);
+
+  const handleJumpToLive = useCallback(() => {
+    const liveUrl = `https://demo-napkin.execute-api.us-east-1.amazonaws.com/prod/orders`;
+    const lambdaArn = `arn:aws:lambda:us-east-1:123456789012:function:demo-CreateOrder`;
+    const tableArn = `arn:aws:dynamodb:us-east-1:123456789012:table/demo-Orders`;
+
+    setAllNodeStatuses('live', { liveUrl, lambdaArn, tableArn });
+    setIsLive(true);
+  }, [setAllNodeStatuses]);
 
   const isValidConnection = useCallback(
     (connection: Edge | Connection) => {
@@ -260,8 +278,6 @@ function CanvasInner() {
       }
 
       setCompilationResult(data);
-
-      // Deployment state transition: deploying -> live
       setAllNodeStatuses('deploying');
 
       setTimeout(() => {
@@ -340,6 +356,13 @@ function CanvasInner() {
         />
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
+
+      {/* Floating Demo Recording HUD */}
+      <DemoHelperHud
+        onResetCanvas={handleResetCanvas}
+        onJumpToLive={handleJumpToLive}
+        isLive={isLive}
+      />
 
       {/* Compilation Result Modal */}
       {compilationResult && (
