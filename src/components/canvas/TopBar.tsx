@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Zap, Download, Play, Check, X, FileJson, ShieldCheck, Loader2, Activity } from 'lucide-react';
+import { Zap, Download, Play, Check, X, FileJson, ShieldCheck, Loader2, Activity, Bot } from 'lucide-react';
 import { exportGraphToJson, type ExportedGraph } from '@/lib/graphExporter';
 import type { AppNode, AppEdge } from '@/types/canvas';
 import type { ServiceReasoning } from '@/types/compiler';
@@ -15,6 +15,7 @@ interface TopBarProps {
   onCompile?: () => void;
   onOpenApiDrawer?: () => void;
   onOpenDbDrawer?: () => void;
+  onToggleExplainer?: () => void;
 }
 
 export default function TopBar({
@@ -26,6 +27,7 @@ export default function TopBar({
   onCompile,
   onOpenApiDrawer,
   onOpenDbDrawer,
+  onToggleExplainer,
 }: TopBarProps) {
   const [jsonModalOpen, setJsonModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -110,7 +112,18 @@ export default function TopBar({
         )}
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2.5 bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 p-1.5 rounded-2xl shadow-2xl">
+        <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 p-1.5 rounded-2xl shadow-2xl">
+          {onToggleExplainer && (
+            <button
+              onClick={onToggleExplainer}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 transition-all"
+              title="Explain Architecture with AI Agent"
+            >
+              <Bot className="w-4 h-4 text-purple-400" />
+              <span>AI Architect</span>
+            </button>
+          )}
+
           <button
             onClick={handleOpenJsonModal}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-all"

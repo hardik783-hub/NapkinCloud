@@ -23,6 +23,7 @@ import DynamoDbNode from './nodes/DynamoDbNode';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import PromptBar from './PromptBar';
+import ArchitectExplainerCard from './ArchitectExplainerCard';
 import CompilationModal from './CompilationModal';
 import DemoHelperHud from './DemoHelperHud';
 import ApiTesterDrawer from './drawers/ApiTesterDrawer';
@@ -98,6 +99,8 @@ function CanvasInner() {
   const [activeDrawer, setActiveDrawer] = useState<'none' | 'api' | 'dynamodb'>('none');
   const [refreshDbTrigger, setRefreshDbTrigger] = useState(0);
   const [reasoning, setReasoning] = useState<ServiceReasoning[] | undefined>(undefined);
+  const [application, setApplication] = useState<{ name: string; description: string } | undefined>(undefined);
+  const [showExplainer, setShowExplainer] = useState(false);
 
   const { screenToFlowPosition, fitView } = useReactFlow();
 
@@ -106,11 +109,13 @@ function CanvasInner() {
       newNodes: AppNode[],
       newEdges: AppEdge[],
       newReasoning: ServiceReasoning[],
-      application: { name: string; description: string }
+      appData: { name: string; description: string }
     ) => {
       setNodes(newNodes);
       setEdges(newEdges);
       setReasoning(newReasoning);
+      setApplication(appData);
+      setShowExplainer(true);
       setIsLive(false);
       setCompilationResult(null);
       setActiveDrawer('none');
@@ -353,6 +358,7 @@ function CanvasInner() {
         onCompile={handleCompile}
         onOpenApiDrawer={() => setActiveDrawer('api')}
         onOpenDbDrawer={() => setActiveDrawer('dynamodb')}
+        onToggleExplainer={() => setShowExplainer((prev) => !prev)}
       />
       <PromptBar
         onApplyArchitecture={handleApplyGeneratedArchitecture}
@@ -416,6 +422,15 @@ function CanvasInner() {
           dbData={dynamoNode.data as DynamoDbNodeData}
           onClose={() => setActiveDrawer('none')}
           refreshTrigger={refreshDbTrigger}
+        />
+      )}
+
+      {/* AI Cloud Architect Explainer Agent Card */}
+      {showExplainer && (
+        <ArchitectExplainerCard
+          application={application}
+          reasoning={reasoning}
+          onClose={() => setShowExplainer(false)}
         />
       )}
     </div>
