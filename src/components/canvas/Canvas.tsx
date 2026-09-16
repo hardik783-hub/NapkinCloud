@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -10,6 +10,8 @@ import {
   useEdgesState,
   addEdge,
   MarkerType,
+  ReactFlowProvider,
+  useReactFlow,
   type Connection,
   type Edge,
   type NodeTypes,
@@ -17,13 +19,15 @@ import {
 import ApiGatewayNode from './nodes/ApiGatewayNode';
 import LambdaNode from './nodes/LambdaNode';
 import DynamoDbNode from './nodes/DynamoDbNode';
+import Sidebar from './Sidebar';
+import TopBar from './TopBar';
 import type { AppNode, AppEdge } from '@/types/canvas';
 
 const initialNodes: AppNode[] = [
   {
     id: 'node-api-1',
     type: 'api_gateway',
-    position: { x: 80, y: 220 },
+    position: { x: 340, y: 220 },
     data: {
       label: 'API Gateway',
       method: 'POST',
@@ -34,19 +38,19 @@ const initialNodes: AppNode[] = [
   {
     id: 'node-lambda-1',
     type: 'lambda',
-    position: { x: 420, y: 200 },
+    position: { x: 680, y: 190 },
     data: {
       label: 'Lambda',
       functionName: 'CreateOrderFunction',
       runtime: 'nodejs20.x',
-      businessLogic: 'Validates order payload, generates orderId UUID, and writes order to database',
+      businessLogic: 'Validates order payload, generates UUID orderId, and saves order record',
       status: 'draft',
     },
   },
   {
     id: 'node-dynamodb-1',
     type: 'dynamodb',
-    position: { x: 790, y: 220 },
+    position: { x: 1060, y: 220 },
     data: {
       label: 'DynamoDB',
       tableName: 'OrdersTable',
@@ -75,9 +79,13 @@ const initialEdges: AppEdge[] = [
   },
 ];
 
-export default function Canvas() {
+let idCounter = 2;
+
+function CanvasInner() {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initialEdges);
+  const { screenToFlowPosition } = useReactFlow();
 
   const nodeTypes: NodeTypes = useMemo(
     () => ({
@@ -108,7 +116,6 @@ export default function Canvas() {
         return targetNode.type === 'dynamodb';
       }
 
-      // DynamoDB has no source outputs
       return false;
     },
     [nodes]
@@ -134,14 +141,95 @@ export default function Canvas() {
     [nodes, setEdges]
   );
 
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const nodeType = event.dataTransfer.getData('application/reactflow');
+      if (!nodeType) return;
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const currentCount = idCounter++;
+      let newNode: AppNode;
+
+      if (nodeType === 'api_gateway') {
+        newNode = {
+          id: `node-api-${currentCount}`,
+          type: 'api_gateway',
+          position,
+          data: {
+            label: 'API Gateway',
+            method: 'POST',
+            path: `/service-${currentCount}`,
+            status: 'draft',
+          },
+        };
+      } else if (nodeType === 'lambda') {
+        newNode = {
+          id: `node-lambda-${currentCount}`,
+          type: 'lambda',
+          position,
+          data: {
+            label: 'Lambda',
+            functionName: `ServiceFunction${currentCount}`,
+            runtime: 'nodejs20.x',
+            businessLogic: 'Processes request payload and updates database',
+            status: 'draft',
+          },
+        };
+      } else if (nodeType === 'dynamodb') {
+        newNode = {
+          id: `node-dynamodb-${currentCount}`,
+          type: 'dynamodb',
+          position,
+          data: {
+            label: 'DynamoDB',
+            tableName: `Table_${currentCount}`,
+            primaryKey: 'id',
+            status: 'draft',
+          },
+        };
+      } else {
+        return;
+      }
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [screenToFlowPosition, setNodes]
+  );
+
+  const handleCompile = () => {
+    console.log('[NapkinCloud] ⚡ Compile to AWS triggered for graph:', {
+      nodeCount: nodes.length,
+      edgeCount: edges.length,
+    });
+    alert(
+      '⚡ [NapkinCloud] Graph captured! Ready for Phase 2: AI Normalizer & Deterministic SAM Compiler.'
+    );
+  };
+
   return (
-    <div className="w-screen h-screen bg-slate-950 text-slate-100 relative">
+    <div ref={reactFlowWrapper} className="w-screen h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
+      <TopBar nodes={nodes} edges={edges} onCompile={handleCompile} />
+      <Sidebar />
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         fitView
@@ -157,5 +245,13 @@ export default function Canvas() {
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
     </div>
+  );
+}
+
+export default function Canvas() {
+  return (
+    <ReactFlowProvider>
+      <CanvasInner />
+    </ReactFlowProvider>
   );
 }
