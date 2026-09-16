@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Zap, Download, Play, Check, X, FileJson, ShieldCheck } from 'lucide-react';
+import { Zap, Download, Play, Check, X, FileJson, ShieldCheck, Loader2 } from 'lucide-react';
 import { exportGraphToJson, type ExportedGraph } from '@/lib/graphExporter';
 import type { AppNode, AppEdge } from '@/types/canvas';
 
 interface TopBarProps {
   nodes: AppNode[];
   edges: AppEdge[];
+  isCompiling?: boolean;
   onCompile?: () => void;
 }
 
-export default function TopBar({ nodes, edges, onCompile }: TopBarProps) {
+export default function TopBar({ nodes, edges, isCompiling, onCompile }: TopBarProps) {
   const [jsonModalOpen, setJsonModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [exportedData, setExportedData] = useState<ExportedGraph | null>(null);
@@ -83,10 +84,24 @@ export default function TopBar({ nodes, edges, onCompile }: TopBarProps) {
 
           <button
             onClick={onCompile}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 hover:brightness-110 active:scale-95 transition-all shadow-[0_0_20px_rgba(245,158,11,0.35)]"
+            disabled={isCompiling}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              isCompiling
+                ? 'bg-amber-500/50 text-slate-950 cursor-wait animate-pulse'
+                : 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 hover:brightness-110 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.35)]'
+            }`}
           >
-            <Play className="w-4 h-4 fill-slate-950" />
-            <span>⚡ Compile to AWS</span>
+            {isCompiling ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                <span>Compiling...</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-slate-950" />
+                <span>⚡ Compile to AWS</span>
+              </>
+            )}
           </button>
         </div>
       </header>

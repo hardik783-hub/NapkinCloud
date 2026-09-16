@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -21,7 +21,9 @@ import LambdaNode from './nodes/LambdaNode';
 import DynamoDbNode from './nodes/DynamoDbNode';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
-import type { AppNode, AppEdge } from '@/types/canvas';
+import CompilationModal from './CompilationModal';
+import type { AppNode, AppEdge, NodeStatus } from '@/types/canvas';
+import type { CompileResponse } from '@/types/compiler';
 
 const initialNodes: AppNode[] = [
   {
@@ -85,6 +87,8 @@ function CanvasInner() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initialEdges);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [compilationResult, setCompilationResult] = useState<CompileResponse | null>(null);
   const { screenToFlowPosition } = useReactFlow();
 
   const nodeTypes: NodeTypes = useMemo(
@@ -94,6 +98,24 @@ function CanvasInner() {
       dynamodb: DynamoDbNode,
     }),
     []
+  );
+
+  const setAllNodeStatuses = useCallback(
+    (status: NodeStatus) => {
+      setNodes((nds) =>
+        nds.map(
+          (node) =>
+            ({
+              ...node,
+              data: {
+                ...node.data,
+                status,
+              },
+            } as AppNode)
+        )
+      );
+    },
+    [setNodes]
   );
 
   const isValidConnection = useCallback(
@@ -207,19 +229,41 @@ function CanvasInner() {
     [screenToFlowPosition, setNodes]
   );
 
-  const handleCompile = () => {
-    console.log('[NapkinCloud] ⚡ Compile to AWS triggered for graph:', {
-      nodeCount: nodes.length,
-      edgeCount: edges.length,
-    });
-    alert(
-      '⚡ [NapkinCloud] Graph captured! Ready for Phase 2: AI Normalizer & Deterministic SAM Compiler.'
-    );
+  const handleCompile = async () => {
+    setIsCompiling(true);
+    setAllNodeStatuses('compiling');
+
+    try {
+      const res = await fetch('/api/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes, edges }),
+      });
+
+      const data: CompileResponse = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.validation?.errors?.join('\n') || 'Compilation failed.');
+      }
+
+      setAllNodeStatuses('deploying');
+      setCompilationResult(data);
+    } catch (err: any) {
+      alert(`⚠️ [Compilation Error]\n${err.message}`);
+      setAllNodeStatuses('draft');
+    } finally {
+      setIsCompiling(false);
+    }
   };
 
   return (
     <div ref={reactFlowWrapper} className="w-screen h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
-      <TopBar nodes={nodes} edges={edges} onCompile={handleCompile} />
+      <TopBar
+        nodes={nodes}
+        edges={edges}
+        isCompiling={isCompiling}
+        onCompile={handleCompile}
+      />
       <Sidebar />
 
       <ReactFlow
@@ -244,6 +288,13 @@ function CanvasInner() {
         />
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
+
+      {compilationResult && (
+        <CompilationModal
+          data={compilationResult}
+          onClose={() => setCompilationResult(null)}
+        />
+      )}
     </div>
   );
 }
