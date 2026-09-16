@@ -6,7 +6,7 @@
 
 | Phase | Name | Status | Plans | Target Date |
 |-------|------|--------|-------|-------------|
-| 1 | Canvas & Graph Representation | Planned | — | Sept 17, 2026 |
+| 1 | Canvas & Graph Representation | Complete ✓ | 3/3 | 2026-09-16 |
 | 2 | AI Reasoning & Deterministic Compiler | Planned | — | Sept 18, 2026 |
 | 3 | Interactive Drawers & Live Testing | Planned | — | Sept 19, 2026 |
 | 4 | End-to-End Reliability & Demo Polish | Planned | — | Sept 20, 2026 |
@@ -18,11 +18,11 @@
 #### Phase 1: Canvas & Graph Representation
 **Goal:** Build a dark-mode interactive React Flow canvas where a user can assemble `API Gateway` ⟶ `Lambda` ⟶ `DynamoDB` with custom labels/annotations and export strict Graph JSON.  
 **Requirements:** R01, R02, R03, R04  
-- [ ] Initialize Next.js project with Tailwind CSS and `@xyflow/react`
-- [ ] Implement custom node components for API Gateway, Lambda, and DynamoDB
-- [ ] Implement edge connections with visual port validation
-- [ ] Add sidebar with draggable components
-- [ ] Implement Graph JSON export function
+- [x] Initialize Next.js project with Tailwind CSS and `@xyflow/react` (Plan 01-01)
+- [x] Implement custom node components for API Gateway, Lambda, and DynamoDB (Plan 01-02)
+- [x] Implement edge connections with visual port validation (Plan 01-02)
+- [x] Add sidebar with draggable components (Plan 01-03)
+- [x] Implement Graph JSON export function (Plan 01-03)
 
 #### Phase 2: AI Reasoning & Deterministic Compiler
 **Goal:** Build the backend pipeline that validates the graph, normalizes intent with Amazon Bedrock (Claude 3.5 Sonnet), and deterministically generates tested `template.yaml` and `handler.js`.  
