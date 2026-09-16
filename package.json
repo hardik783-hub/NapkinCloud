@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "node --experimental-strip-types scripts/verify-e2e.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1133.0",
     "@xyflow/react": "^12.3.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.453.0",
