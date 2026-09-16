@@ -8,7 +8,7 @@
 |-------|------|--------|-------|-------------|
 | 1 | Canvas & Graph Representation | Complete ✓ | 3/3 | 2026-09-16 |
 | 2 | AI Reasoning & Deterministic Compiler | Complete ✓ | 3/3 | 2026-09-16 |
-| 3 | Interactive Drawers & Live Testing | Planned | — | Sept 19, 2026 |
+| 3 | Interactive Drawers & Live Testing | Complete ✓ | 3/3 | 2026-09-16 |
 | 4 | End-to-End Reliability & Demo Polish | Planned | — | Sept 20, 2026 |
 
 ---
@@ -37,10 +37,10 @@
 #### Phase 3: Interactive Drawers & Live Testing
 **Goal:** Turn the canvas into an active control surface once deployed, featuring live node statuses, the slide-out API tester drawer, and the live DynamoDB inspector.  
 **Requirements:** R10, R11, R12  
-- [ ] Implement dynamic node visual states (`compiling`, `deploying`, `🟢 live`, `🔴 failed`)
-- [ ] Build API tester drawer with editable JSON request body, send trigger, and response viewer
-- [ ] Build DynamoDB inspector drawer with live table rendering
-- [ ] Integrate CORS handling and backend proxy routes (`/api/test`, `/api/data`)
+- [x] Implement dynamic node visual states (`compiling`, `deploying`, `🟢 live`, `🔴 failed`) (Plan 03-01)
+- [x] Build API tester drawer with editable JSON request body, send trigger, and response viewer (Plan 03-02)
+- [x] Build DynamoDB inspector drawer with live table rendering (Plan 03-03)
+- [x] Integrate CORS handling and backend proxy routes (`/api/test`, `/api/data`) (Plan 03-02, 03-03)
 
 #### Phase 4: End-to-End Reliability & Demo Polish
 **Goal:** Run end-to-end integration with teammate's AWS deployment, eliminate UI quirks, test fallback modes, and record the 3-minute video.  
