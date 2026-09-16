@@ -51,6 +51,52 @@ export async function POST(req: Request) {
     // Step 4: Deterministic SAM Template Compilation
     const templateYaml = compileSamTemplate(normalizedArch, projectId);
 
+    const reasoning = [
+      {
+        service: 'api_gateway',
+        reason: `Exposes HTTPS ${normalizedArch.api.method} ${normalizedArch.api.path} with managed rate-limiting, CORS, and request routing.`,
+      },
+      {
+        service: 'lambda',
+        reason: `Serverless NodeJS compute (${normalizedArch.lambda.functionName}) executes business logic on-demand without managing EC2 servers.`,
+      },
+      {
+        service: 'dynamodb',
+        reason: `Single-digit millisecond latency NoSQL storage in table '${normalizedArch.dynamodb.tableName}' partitioned by '${normalizedArch.dynamodb.partitionKey}'.`,
+      },
+    ];
+
+    const teammateArchitecture = {
+      application: {
+        name: `${normalizedArch.api.path.replace(/^\//, '').toUpperCase() || 'Orders'} Service`,
+        description: normalizedArch.lambda.businessLogicSummary,
+      },
+      architecture: {
+        nodes: [
+          {
+            id: validation.nodes.api.id,
+            type: 'api_gateway',
+            purpose: `HTTP API endpoint for ${normalizedArch.api.method} ${normalizedArch.api.path}`,
+          },
+          {
+            id: validation.nodes.lambda.id,
+            type: 'lambda',
+            purpose: normalizedArch.lambda.businessLogicSummary,
+          },
+          {
+            id: validation.nodes.dynamodb.id,
+            type: 'dynamodb',
+            purpose: `Store items in ${normalizedArch.dynamodb.tableName} indexed by ${normalizedArch.dynamodb.partitionKey}`,
+          },
+        ],
+        connections: edges.map((e) => ({
+          from: e.source,
+          to: e.target,
+        })),
+      },
+      reasoning,
+    };
+
     return NextResponse.json<CompileResponse>({
       success: true,
       projectId,
@@ -58,6 +104,8 @@ export async function POST(req: Request) {
       templateYaml,
       handlerJs,
       normalizedArchitecture: normalizedArch,
+      reasoning,
+      teammateArchitecture,
       validation: {
         valid: true,
         errors: [],

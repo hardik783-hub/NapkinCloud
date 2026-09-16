@@ -3,6 +3,8 @@ import { normalizeIntentWithBedrock } from '../src/lib/bedrock.ts';
 import { synthesizeLambdaCode } from '../src/lib/lambdaSynthesizer.ts';
 import { compileSamTemplate } from '../src/lib/compiler.ts';
 import { insertTableRecord, getTableRecords } from '../src/lib/dataStore.ts';
+import { generateArchitectureFromPrompt } from '../src/lib/architectureGenerator.ts';
+import { exportGraphToJson } from '../src/lib/graphExporter.ts';
 import type { AppNode, AppEdge } from '../src/types/canvas.ts';
 
 function assert(condition: boolean, message: string) {
@@ -143,8 +145,23 @@ async function runE2ETestSuite() {
   console.log('  8. Open DynamoDB inspector                 ✓');
   console.log('  9. See real order record                   ✓');
 
+  // Step 10: Phase 5 Prompt-to-Architecture and Teammate Harmonized Schema
+  console.log('\n[Step 10/10] Verifying Natural Language Prompt-to-Canvas & Teammate Schemas...');
+  const genResult = await generateArchitectureFromPrompt('I want an API where users can create orders and save to DB');
+  assert(genResult.success === true, 'Prompt-to-Architecture succeeded');
+  assert(genResult.canvasNodes.length === 3, 'Generated 3 canvas nodes (API, Lambda, DynamoDB)');
+  assert(genResult.canvasEdges.length === 2, 'Generated 2 canvas edges');
+  assert(Boolean(genResult.application?.name), `Generated application name: "${genResult.application?.name}"`);
+  assert(genResult.architecture?.nodes?.length === 3, 'Generated Hardik Schema #2 architecture nodes');
+  assert(genResult.reasoning?.length === 3, 'Generated Hardik Schema #3 reasoning entries for all services');
+
+  const exportedGraph = exportGraphToJson(genResult.canvasNodes, genResult.canvasEdges, 'proj-test', genResult.reasoning);
+  assert(exportedGraph.validation.isValidP0 === true, 'Exported graph satisfies strict P0 topology');
+  assert(Boolean(exportedGraph.application?.name), 'Exported graph contains application metadata');
+  assert(Boolean(exportedGraph.reasoning && exportedGraph.reasoning.length === 3), 'Exported graph contains 3-service reasoning breakdown');
+
   console.log('\n====================================================');
-  console.log('🎉 ALL 9 STEPS OF DEFINITION OF DONE PASSED!');
+  console.log('🎉 ALL DEFINITION OF DONE & PHASE 5 TESTS PASSED!');
   console.log('====================================================');
 }
 
@@ -152,3 +169,4 @@ runE2ETestSuite().catch((err) => {
   console.error('Test Suite Failed:', err);
   process.exit(1);
 });
+

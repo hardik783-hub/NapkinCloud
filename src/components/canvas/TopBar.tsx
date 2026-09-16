@@ -4,12 +4,14 @@ import React, { useState } from 'react';
 import { Zap, Download, Play, Check, X, FileJson, ShieldCheck, Loader2, Activity } from 'lucide-react';
 import { exportGraphToJson, type ExportedGraph } from '@/lib/graphExporter';
 import type { AppNode, AppEdge } from '@/types/canvas';
+import type { ServiceReasoning } from '@/types/compiler';
 
 interface TopBarProps {
   nodes: AppNode[];
   edges: AppEdge[];
   isCompiling?: boolean;
   isLive?: boolean;
+  reasoning?: ServiceReasoning[];
   onCompile?: () => void;
   onOpenApiDrawer?: () => void;
   onOpenDbDrawer?: () => void;
@@ -20,6 +22,7 @@ export default function TopBar({
   edges,
   isCompiling,
   isLive,
+  reasoning,
   onCompile,
   onOpenApiDrawer,
   onOpenDbDrawer,
@@ -29,7 +32,7 @@ export default function TopBar({
   const [exportedData, setExportedData] = useState<ExportedGraph | null>(null);
 
   const handleOpenJsonModal = () => {
-    const data = exportGraphToJson(nodes, edges);
+    const data = exportGraphToJson(nodes, edges, 'proj-demo-orders', reasoning);
     setExportedData(data);
     setJsonModalOpen(true);
   };

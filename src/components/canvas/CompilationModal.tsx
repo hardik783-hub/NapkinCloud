@@ -10,13 +10,14 @@ interface CompilationModalProps {
 }
 
 export default function CompilationModal({ data, onClose }: CompilationModalProps) {
-  const [activeTab, setActiveTab] = useState<'sam' | 'lambda' | 'handoff'>('sam');
+  const [activeTab, setActiveTab] = useState<'sam' | 'lambda' | 'handoff' | 'reasoning'>('sam');
   const [copied, setCopied] = useState(false);
 
   const activeContent = {
     sam: data.templateYaml || '',
     lambda: data.handlerJs || '',
     handoff: JSON.stringify(data.handOffContract || {}, null, 2),
+    reasoning: JSON.stringify(data.reasoning || [], null, 2),
   }[activeTab];
 
   const handleCopy = () => {
@@ -104,6 +105,18 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
             </button>
 
             <button
+              onClick={() => setActiveTab('reasoning')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                activeTab === 'reasoning'
+                  ? 'bg-slate-800 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>AI Architecture Reasoning</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('handoff')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                 activeTab === 'handoff'
@@ -112,7 +125,7 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
               }`}
             >
               <Layers className="w-4 h-4 text-emerald-400" />
-              <span>Teammate Hand-off Contract</span>
+              <span>Teammate Contract</span>
             </button>
           </div>
 
@@ -125,11 +138,35 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
           </button>
         </div>
 
-        {/* Code Content */}
+        {/* Content Area */}
         <div className="flex-1 overflow-auto mt-3 rounded-xl bg-slate-950 border border-slate-800/80 p-4">
-          <pre className="text-xs font-mono text-slate-300 leading-relaxed select-text">
-            {activeContent}
-          </pre>
+          {activeTab === 'reasoning' && data.reasoning ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs text-slate-400 font-mono">
+                <span>Bedrock Architectural Decisions (P0 Microservice Topology)</span>
+                <span className="text-purple-400 font-bold">Hardik Schema #3</span>
+              </div>
+              {data.reasoning.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs font-bold uppercase px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      {item.service}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans mt-1">
+                    {item.reason}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <pre className="text-xs font-mono text-slate-300 leading-relaxed select-text">
+              {activeContent}
+            </pre>
+          )}
         </div>
 
         {/* Footer */}

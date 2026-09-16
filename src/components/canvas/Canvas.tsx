@@ -22,12 +22,13 @@ import LambdaNode from './nodes/LambdaNode';
 import DynamoDbNode from './nodes/DynamoDbNode';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import PromptBar from './PromptBar';
 import CompilationModal from './CompilationModal';
 import DemoHelperHud from './DemoHelperHud';
 import ApiTesterDrawer from './drawers/ApiTesterDrawer';
 import DynamoDbDrawer from './drawers/DynamoDbDrawer';
 import type { AppNode, AppEdge, NodeStatus, ApiGatewayNodeData, DynamoDbNodeData } from '@/types/canvas';
-import type { CompileResponse } from '@/types/compiler';
+import type { CompileResponse, ServiceReasoning } from '@/types/compiler';
 
 const initialNodes: AppNode[] = [
   {
@@ -96,8 +97,29 @@ function CanvasInner() {
   const [compilationResult, setCompilationResult] = useState<CompileResponse | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<'none' | 'api' | 'dynamodb'>('none');
   const [refreshDbTrigger, setRefreshDbTrigger] = useState(0);
+  const [reasoning, setReasoning] = useState<ServiceReasoning[] | undefined>(undefined);
 
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+
+  const handleApplyGeneratedArchitecture = useCallback(
+    (
+      newNodes: AppNode[],
+      newEdges: AppEdge[],
+      newReasoning: ServiceReasoning[],
+      application: { name: string; description: string }
+    ) => {
+      setNodes(newNodes);
+      setEdges(newEdges);
+      setReasoning(newReasoning);
+      setIsLive(false);
+      setCompilationResult(null);
+      setActiveDrawer('none');
+      setTimeout(() => {
+        fitView({ padding: 0.2, duration: 800 });
+      }, 100);
+    },
+    [setNodes, setEdges, fitView]
+  );
 
   const nodeTypes: NodeTypes = useMemo(
     () => ({
@@ -327,9 +349,14 @@ function CanvasInner() {
         edges={edges}
         isCompiling={isCompiling}
         isLive={isLive}
+        reasoning={reasoning}
         onCompile={handleCompile}
         onOpenApiDrawer={() => setActiveDrawer('api')}
         onOpenDbDrawer={() => setActiveDrawer('dynamodb')}
+      />
+      <PromptBar
+        onApplyArchitecture={handleApplyGeneratedArchitecture}
+        disabled={isCompiling}
       />
       <Sidebar />
 

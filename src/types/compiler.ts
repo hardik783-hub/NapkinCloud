@@ -37,6 +37,30 @@ export interface CompileRequest {
   edges: AppEdge[];
 }
 
+export interface ServiceReasoning {
+  service: 'api_gateway' | 'lambda' | 'dynamodb' | string;
+  reason: string;
+}
+
+export interface TeammateArchitecture {
+  application: {
+    name: string;
+    description: string;
+  };
+  architecture: {
+    nodes: Array<{
+      id: string;
+      type: string;
+      purpose: string;
+    }>;
+    connections: Array<{
+      from: string;
+      to: string;
+    }>;
+  };
+  reasoning: ServiceReasoning[];
+}
+
 export interface CompileResponse {
   success: boolean;
   projectId: string;
@@ -44,6 +68,8 @@ export interface CompileResponse {
   templateYaml?: string;
   handlerJs?: string;
   normalizedArchitecture?: NormalizedArchitecture;
+  reasoning?: ServiceReasoning[];
+  teammateArchitecture?: TeammateArchitecture;
   validation: {
     valid: boolean;
     errors: string[];
@@ -54,3 +80,4 @@ export interface CompileResponse {
     handlerJs: string;
   };
 }
+
