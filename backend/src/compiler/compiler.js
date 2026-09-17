@@ -69,13 +69,17 @@ function compileArchitecture(graph) {
 
   // STEP 5 — Return compilation result
   return {
-    success: true,
+  success: true,
 
-    files: {
-      template: templatePath,
-      lambda: lambdaPath,
-    },
-  };
+  files: {
+    template: templatePath,
+    lambda: lambdaPath,
+  },
+
+  templateYaml: fs.readFileSync(templatePath, "utf8"),
+
+  handlerJs: fs.readFileSync(lambdaPath, "utf8"),
+};
 }
 
 module.exports = {

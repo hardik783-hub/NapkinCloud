@@ -68,21 +68,29 @@ app.post("/api/compile", async (req, res) => {
 
     // 4. Return result
     res.json({
+  success: true,
 
-      success: true,
+  message: "Architecture deployed successfully",
 
-      message:
-        "Architecture deployed successfully",
+  projectId: graph.projectId || stackName,
 
-      stackName,
+  timestamp: new Date().toISOString(),
 
-      status:
-        deployment.status,
+  stackName,
 
-      outputs:
-        deployment.outputs
+  status: deployment.status,
 
-    });
+  outputs: deployment.outputs,
+
+  templateYaml: compilation.templateYaml,
+
+  handlerJs: compilation.handlerJs,
+
+  validation: {
+    valid: true,
+    errors: []
+  }
+});
 
   } catch (error) {
 
@@ -103,7 +111,7 @@ app.post("/api/compile", async (req, res) => {
 });
 
 
-const PORT = 3000;
+const PORT = 3001;
 
 app.listen(PORT, () => {
 

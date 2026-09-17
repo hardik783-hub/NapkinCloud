@@ -15,16 +15,16 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: orderId
+        - AttributeName: id
           AttributeType: S
       KeySchema:
-        - AttributeName: orderId
+        - AttributeName: id
           KeyType: HASH
   CreateOrderFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName:
-        Fn::Sub: ${AWS::StackName}-CreateOrderFunction
+        Fn::Sub: ${AWS::StackName}-NapkinCloudFunction
       CodeUri:
         Bucket: aws-sam-cli-managed-default-samclisourcebucket-67tausw1jwyw
         Key: placeholder/lambda.zip

@@ -166,15 +166,27 @@ function CanvasInner() {
     setActiveDrawer('none');
     setCompilationResult(null);
   }, [setEdges, setNodes]);
+  
+const handleJumpToLive = useCallback(() => {
+  if (!compilationResult?.outputs) {
+    alert('⚡ Deploy the architecture first.');
+    return;
+  }
 
-  const handleJumpToLive = useCallback(() => {
-    const liveUrl = `https://demo-napkin.execute-api.us-east-1.amazonaws.com/prod/orders`;
-    const lambdaArn = `arn:aws:lambda:us-east-1:123456789012:function:demo-CreateOrder`;
-    const tableArn = `arn:aws:dynamodb:us-east-1:123456789012:table/demo-Orders`;
+  const {
+    ApiUrl,
+    LambdaFunctionName,
+    OrdersTableName,
+  } = compilationResult.outputs;
 
-    setAllNodeStatuses('live', { liveUrl, lambdaArn, tableArn });
-    setIsLive(true);
-  }, [setAllNodeStatuses]);
+  setAllNodeStatuses('live', {
+    liveUrl: ApiUrl,
+    lambdaArn: LambdaFunctionName,
+    tableArn: OrdersTableName,
+  });
+
+  setIsLive(true);
+}, [compilationResult, setAllNodeStatuses]);
 
   const isValidConnection = useCallback(
     (connection: Edge | Connection) => {
@@ -288,40 +300,52 @@ function CanvasInner() {
   );
 
   const handleCompile = async () => {
-    setIsCompiling(true);
-    setAllNodeStatuses('compiling');
+  setIsCompiling(true);
+  setAllNodeStatuses('compiling');
 
-    try {
-      const res = await fetch('/api/compile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges }),
-      });
+  try {
+    const res = await fetch('/api/compile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes, edges }),
+    });
 
-      const data: CompileResponse = await res.json();
+    const data: CompileResponse = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.validation?.errors?.join('\n') || 'Compilation failed.');
-      }
-
-      setCompilationResult(data);
-      setAllNodeStatuses('deploying');
-
-      setTimeout(() => {
-        const liveUrl = `https://${data.projectId}.execute-api.us-east-1.amazonaws.com/prod/orders`;
-        const lambdaArn = `arn:aws:lambda:us-east-1:123456789012:function:${data.projectId}-CreateOrder`;
-        const tableArn = `arn:aws:dynamodb:us-east-1:123456789012:table/${data.projectId}-Orders`;
-
-        setAllNodeStatuses('live', { liveUrl, lambdaArn, tableArn });
-        setIsLive(true);
-      }, 3000);
-    } catch (err: any) {
-      alert(`⚠️ [Compilation Error]\n${err.message}`);
-      setAllNodeStatuses('draft');
-    } finally {
-      setIsCompiling(false);
+    if (!res.ok || !data.success) {
+      throw new Error(
+        data.validation?.errors?.join('\n') || 'Compilation failed.'
+      );
     }
-  };
+
+    setCompilationResult(data);
+    setAllNodeStatuses('deploying');
+
+    // Use REAL AWS deployment outputs
+    const liveUrl = data.outputs?.ApiUrl;
+    const lambdaName = data.outputs?.LambdaFunctionName;
+    const tableName = data.outputs?.OrdersTableName;
+
+    setAllNodeStatuses('live', {
+      liveUrl,
+      lambdaArn: lambdaName,
+      tableArn: tableName,
+    });
+
+    setIsLive(true);
+
+  } catch (err: any) {
+    console.error('❌ Compile failed:', err);
+
+    alert(`⚠️ [Compilation Error]\n${err.message}`);
+
+    setAllNodeStatuses('draft');
+    setIsLive(false);
+
+  } finally {
+    setIsCompiling(false);
+  }
+};
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {

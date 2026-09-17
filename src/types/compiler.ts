@@ -65,15 +65,30 @@ export interface CompileResponse {
   success: boolean;
   projectId: string;
   timestamp: string;
+
   templateYaml?: string;
   handlerJs?: string;
+
   normalizedArchitecture?: NormalizedArchitecture;
   reasoning?: ServiceReasoning[];
   teammateArchitecture?: TeammateArchitecture;
+
   validation: {
     valid: boolean;
     errors: string[];
   };
+
+  outputs?: {
+    ApiUrl?: string;
+    OrdersTableName?: string;
+    LambdaFunctionName?: string;
+    [key: string]: string | undefined;
+  };
+
+  stackName?: string;
+  status?: string;
+  message?: string;
+
   handOffContract?: {
     projectId: string;
     templateYaml: string;
