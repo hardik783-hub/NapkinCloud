@@ -1,47 +1,68 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { insertTableRecord, type TableRecord } from '@/lib/dataStore';
 
 export async function POST(req: Request) {
   const startTime = performance.now();
 
   try {
     const body = await req.json();
+
     const {
+      liveUrl,
+      method = 'POST',
       payload = {},
-      tableName = 'OrdersTable',
-      primaryKey = 'orderId',
     } = body;
 
-    const pkValue = payload[primaryKey] || `ord-${crypto.randomUUID().slice(0, 8)}`;
+    if (!liveUrl) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No deployed API URL available. Compile the architecture first.',
+        },
+        { status: 400 }
+      );
+    }
 
-    const record: TableRecord = {
-      ...payload,
-      [primaryKey]: pkValue,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      _status: 'ACTIVE',
-    };
+    console.log(`🌐 Invoking live AWS API: ${method} ${liveUrl}`);
 
-    // Persist to server store
-    insertTableRecord(tableName, record);
+    const awsResponse = await fetch(liveUrl, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: method === 'GET' ? undefined : JSON.stringify(payload),
+    });
 
-    const latencyMs = Math.round(performance.now() - startTime + 25); // Add realistic cloud hop delay
+    const latencyMs = Math.round(performance.now() - startTime);
+
+    const responseText = await awsResponse.text();
+
+    let responseBody: any;
+
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch {
+      responseBody = responseText;
+    }
 
     return NextResponse.json({
-      success: true,
-      statusCode: 200,
+      success: awsResponse.ok,
+      statusCode: awsResponse.status,
       latencyMs,
-      endpoint: body.path || '/orders',
-      message: '200 OK — Order successfully processed by AWS Lambda & committed to DynamoDB',
-      item: record,
+      endpoint: liveUrl,
+      message: awsResponse.ok
+        ? 'Live AWS API request completed successfully'
+        : 'AWS API request failed',
+      item: responseBody,
     });
+
   } catch (error: any) {
+    console.error('❌ Live API invocation failed:', error);
+
     return NextResponse.json(
       {
         success: false,
         statusCode: 500,
-        error: error.message || 'Invocation failed',
+        error: error.message || 'Live API invocation failed',
       },
       { status: 500 }
     );

@@ -19,21 +19,41 @@ export default function DynamoDbDrawer({
   const [items, setItems] = useState<TableRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<TableRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const actualTableName = dbData.liveTableName?.trim();
+
+  console.log('[DEBUG DB DATA]', dbData);
+  console.log('[DEBUG PHYSICAL TABLE]', dbData.liveTableName);
 
   const fetchRecords = useCallback(async () => {
+    if (!actualTableName) {
+      setItems([]);
+      setError('The deployed DynamoDB table name is unavailable. Deploy the architecture again before inspecting live data.');
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/data?tableName=${encodeURIComponent(dbData.tableName || 'OrdersTable')}`);
+      console.log('[DEBUG DATA FETCH]', actualTableName);
+      const res = await fetch(
+        `/api/data?tableName=${encodeURIComponent(actualTableName)}`
+      );
       const data = await res.json();
       if (data.success && Array.isArray(data.items)) {
         setItems(data.items);
+      } else {
+        setItems([]);
+        setError(data.error || 'Failed to fetch table items.');
       }
     } catch (err) {
       console.error('Failed to fetch table items:', err);
+      setItems([]);
+      setError('Unable to reach the DynamoDB Inspector. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [dbData.tableName]);
+  }, [actualTableName]);
 
   useEffect(() => {
     fetchRecords();
@@ -59,7 +79,16 @@ export default function DynamoDbDrawer({
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono">
-              Table: <span className="text-indigo-400 font-bold">{dbData.tableName}</span> ({pkName})
+              Table:{' '}
+<span className="text-indigo-400 font-bold">
+  {dbData.tableName}
+</span>
+
+{dbData.liveTableName && (
+  <span className="text-slate-500 block text-[10px] mt-1 truncate">
+    AWS: {dbData.liveTableName}
+  </span>
+)} ({pkName})
             </p>
           </div>
         </div>
@@ -99,6 +128,11 @@ export default function DynamoDbDrawer({
 
       {/* Table Records List */}
       <div className="flex-1 overflow-auto p-5">
+        {error && (
+          <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
+            {error}
+          </div>
+        )}
         {items.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-800 rounded-2xl">
             <Layers className="w-8 h-8 text-slate-600 mb-2" />

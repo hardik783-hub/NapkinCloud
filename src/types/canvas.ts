@@ -27,6 +27,7 @@ export interface DynamoDbNodeData extends Record<string, unknown> {
   primaryKey: string;
   status: NodeStatus;
   arn?: string;
+  liveTableName?: string;
 }
 
 export type ApiGatewayNode = Node<ApiGatewayNodeData, 'api_gateway'>;

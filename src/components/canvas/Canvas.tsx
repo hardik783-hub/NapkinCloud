@@ -96,6 +96,9 @@ function CanvasInner() {
   const [isCompiling, setIsCompiling] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [compilationResult, setCompilationResult] = useState<CompileResponse | null>(null);
+  // Deployment output must outlive the result modal. Closing that modal must not
+  // make live AWS operations fall back to architecture/logical resource names.
+  const [deployedTableName, setDeployedTableName] = useState<string | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<'none' | 'api' | 'dynamodb'>('none');
   const [refreshDbTrigger, setRefreshDbTrigger] = useState(0);
   const [reasoning, setReasoning] = useState<ServiceReasoning[] | undefined>(undefined);
@@ -118,6 +121,7 @@ function CanvasInner() {
       setShowExplainer(true);
       setIsLive(false);
       setCompilationResult(null);
+      setDeployedTableName(null);
       setActiveDrawer('none');
       setTimeout(() => {
         fitView({ padding: 0.2, duration: 800 });
@@ -136,14 +140,24 @@ function CanvasInner() {
   );
 
   const setAllNodeStatuses = useCallback(
-    (status: NodeStatus, metadata?: { liveUrl?: string; lambdaArn?: string; tableArn?: string }) => {
+  (
+    status: NodeStatus,
+    metadata?: {
+      liveUrl?: string;
+      lambdaArn?: string;
+      tableArn?: string;
+      liveTableName?: string;
+    }
+  ) => {
       setNodes((nds) =>
         nds.map((node) => {
           let extra: Record<string, any> = {};
           if (status === 'live' && metadata) {
             if (node.type === 'api_gateway') extra.liveUrl = metadata.liveUrl;
             if (node.type === 'lambda') extra.arn = metadata.lambdaArn;
-            if (node.type === 'dynamodb') extra.arn = metadata.tableArn;
+            if (node.type === 'dynamodb') {
+  extra.liveTableName = metadata.liveTableName;
+}
           }
           return {
             ...node,
@@ -165,28 +179,17 @@ function CanvasInner() {
     setIsLive(false);
     setActiveDrawer('none');
     setCompilationResult(null);
+    setDeployedTableName(null);
   }, [setEdges, setNodes]);
-  
+   
 const handleJumpToLive = useCallback(() => {
-  if (!compilationResult?.outputs) {
+  if (!isLive) {
     alert('⚡ Deploy the architecture first.');
     return;
   }
 
-  const {
-    ApiUrl,
-    LambdaFunctionName,
-    OrdersTableName,
-  } = compilationResult.outputs;
-
-  setAllNodeStatuses('live', {
-    liveUrl: ApiUrl,
-    lambdaArn: LambdaFunctionName,
-    tableArn: OrdersTableName,
-  });
-
-  setIsLive(true);
-}, [compilationResult, setAllNodeStatuses]);
+  setAllNodeStatuses('live');
+}, [isLive, setAllNodeStatuses]);
 
   const isValidConnection = useCallback(
     (connection: Edge | Connection) => {
@@ -301,6 +304,7 @@ const handleJumpToLive = useCallback(() => {
 
   const handleCompile = async () => {
   setIsCompiling(true);
+  setDeployedTableName(null);
   setAllNodeStatuses('compiling');
 
   try {
@@ -319,18 +323,21 @@ const handleJumpToLive = useCallback(() => {
     }
 
     setCompilationResult(data);
+    console.log('[DEBUG COMPILE OUTPUTS]', data.outputs);
     setAllNodeStatuses('deploying');
 
     // Use REAL AWS deployment outputs
     const liveUrl = data.outputs?.ApiUrl;
     const lambdaName = data.outputs?.LambdaFunctionName;
-    const tableName = data.outputs?.OrdersTableName;
+    const tableName = data.outputs?.OrdersTableName?.trim() || null;
+    setDeployedTableName(tableName);
+    console.log('[DEBUG DEPLOYED TABLE]', data.outputs?.OrdersTableName);
 
     setAllNodeStatuses('live', {
-      liveUrl,
-      lambdaArn: lambdaName,
-      tableArn: tableName,
-    });
+  liveUrl,
+  lambdaArn: lambdaName,
+  liveTableName: tableName || undefined,
+});
 
     setIsLive(true);
 
@@ -370,8 +377,19 @@ const handleJumpToLive = useCallback(() => {
 
   const apiNode = nodes.find((n) => n.type === 'api_gateway') as AppNode | undefined;
   const dynamoNode = nodes.find((n) => n.type === 'dynamodb') as AppNode | undefined;
+  const drawerDbData = dynamoNode
+    ? {
+        ...(dynamoNode.data as DynamoDbNodeData),
+        liveTableName: deployedTableName ?? undefined,
+      }
+    : null;
+
+  if (activeDrawer === 'dynamodb' && drawerDbData) {
+    console.log('[DEBUG DRAWER TABLE]', deployedTableName);
+  }
 
   return (
+    
     <div ref={reactFlowWrapper} className="w-screen h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
       <TopBar
         nodes={nodes}
@@ -441,9 +459,9 @@ const handleJumpToLive = useCallback(() => {
       )}
 
       {/* Live In-Canvas DynamoDB Inspector Drawer */}
-      {activeDrawer === 'dynamodb' && dynamoNode && (
+      {activeDrawer === 'dynamodb' && drawerDbData && (
         <DynamoDbDrawer
-          dbData={dynamoNode.data as DynamoDbNodeData}
+          dbData={drawerDbData}
           onClose={() => setActiveDrawer('none')}
           refreshTrigger={refreshDbTrigger}
         />
@@ -461,7 +479,9 @@ const handleJumpToLive = useCallback(() => {
   );
 }
 
+
 export default function Canvas() {
+  
   return (
     <ReactFlowProvider>
       <CanvasInner />

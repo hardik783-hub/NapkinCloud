@@ -53,12 +53,11 @@ export default function ApiTesterDrawer({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          path: apiData.path,
-          method: apiData.method,
-          payload: parsed,
-          tableName,
-          primaryKey,
-        }),
+        liveUrl: apiData.liveUrl,
+        path: apiData.path,
+        method: apiData.method,
+        payload: parsed,
+      }),
       });
 
       const data = await res.json();
