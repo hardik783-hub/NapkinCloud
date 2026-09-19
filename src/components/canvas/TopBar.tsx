@@ -50,57 +50,62 @@ export default function TopBar({
 
   return (
     <>
-      <header className="absolute top-4 left-6 right-6 z-20 flex items-center justify-between pointer-events-auto">
-        {/* Left: Brand / Title */}
-        <div className="flex items-center gap-3 bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 px-4 py-2.5 rounded-2xl shadow-2xl">
-          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
-            <Zap className="w-5 h-5 fill-amber-400" />
-          </div>
-          <div>
+      <header className="fixed top-0 left-0 right-0 h-14 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/90 px-5 z-30 flex items-center justify-between pointer-events-auto select-none">
+        {/* Left: Brand / Studio Breadcrumb */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+              <Zap className="w-4 h-4 fill-amber-400" />
+            </div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-black tracking-tight text-white uppercase">
+              <h1 className="text-xs font-black tracking-wider text-white uppercase">
                 NapkinCloud
               </h1>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
-                v1.0 MVP
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 text-cyan-400 border border-slate-700/80 font-semibold">
+                v1.0
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">
-              Draw ⟶ Compile ⟶ Deploy ⟶ 🟢 Live
-            </p>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-400 pl-3 border-l border-slate-800">
+            <span>Draw</span>
+            <span className="text-slate-600">⟶</span>
+            <span>Compile</span>
+            <span className="text-slate-600">⟶</span>
+            <span>Deploy</span>
+            <span className="text-slate-600">⟶</span>
+            <span className="text-emerald-400 font-semibold">Live</span>
           </div>
         </div>
 
-        {/* Center: Live Control Surface Status Badge */}
+        {/* Center: Status Indicator */}
         {isLive ? (
-          <div className="flex items-center gap-3 bg-emerald-950/50 backdrop-blur-md border border-emerald-500/40 px-4 py-2 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.25)] text-xs font-mono">
-            <div className="flex items-center gap-2 text-emerald-400 font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>🟢 Live Control Surface Active</span>
-            </div>
-            <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-emerald-800/60">
+          <div className="flex items-center gap-2.5 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <span className="text-emerald-400 font-bold">🟢 Live Control Surface Active</span>
+            <div className="hidden lg:flex items-center gap-1.5 pl-2.5 border-l border-emerald-800/50">
               <button
                 onClick={onOpenApiDrawer}
-                className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 text-[11px] transition"
+                className="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[11px] transition font-medium"
               >
                 Test API
               </button>
               <button
                 onClick={onOpenDbDrawer}
-                className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-[11px] transition"
+                className="px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-[11px] transition font-medium"
               >
                 Inspect DB
               </button>
             </div>
           </div>
         ) : (
-          <div className="hidden md:flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-mono">
+          <div className="hidden md:flex items-center gap-2 bg-slate-900/60 border border-slate-800/80 px-3 py-1.5 rounded-lg text-xs font-mono">
             <ShieldCheck
-              className={`w-4 h-4 ${
+              className={`w-3.5 h-3.5 ${
                 validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
               }`}
             />
-            <span className="text-slate-300">P0 Architecture:</span>
+            <span className="text-slate-400">P0 Topology:</span>
             <span
               className={`font-semibold ${
                 validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
@@ -112,51 +117,51 @@ export default function TopBar({
         )}
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 p-1.5 rounded-2xl shadow-2xl">
+        <div className="flex items-center gap-2">
           {onToggleExplainer && (
             <button
               onClick={onToggleExplainer}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 active:scale-[0.98] transition-all"
               title="Explain Architecture with AI Agent"
             >
-              <Bot className="w-4 h-4 text-purple-400" />
+              <Bot className="w-3.5 h-3.5 text-purple-400" />
               <span>AI Architect</span>
             </button>
           )}
 
           <button
             onClick={handleOpenJsonModal}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 border border-slate-800 active:scale-[0.98] transition-all"
           >
-            <FileJson className="w-4 h-4 text-cyan-400" />
+            <FileJson className="w-3.5 h-3.5 text-cyan-400" />
             <span>Export JSON</span>
           </button>
 
           <button
             onClick={onCompile}
             disabled={isCompiling}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98] transition-all ${
               isCompiling
                 ? 'bg-amber-500/50 text-slate-950 cursor-wait animate-pulse'
                 : isLive
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
-                : 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 hover:brightness-110 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.35)]'
+                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-[0_0_15px_rgba(251,191,36,0.25)]'
             }`}
           >
             {isCompiling ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
                 <span>Compiling...</span>
               </>
             ) : isLive ? (
               <>
-                <Activity className="w-4 h-4 text-slate-950" />
-                <span>🟢 Re-Deploy</span>
+                <Activity className="w-3.5 h-3.5 text-slate-950" />
+                <span>🟢 Live Control</span>
               </>
             ) : (
               <>
-                <Play className="w-4 h-4 fill-slate-950" />
-                <span>⚡ Compile to AWS</span>
+                <Play className="w-3.5 h-3.5 fill-slate-950" />
+                <span>Compile & Deploy</span>
               </>
             )}
           </button>

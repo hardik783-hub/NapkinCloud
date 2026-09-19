@@ -42,6 +42,7 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
   const [prompt, setPrompt] = useState('I want an API where users can create and retrieve their previous orders.');
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleGenerate = async (textToUse?: string) => {
     const activePrompt = (textToUse || prompt).trim();
@@ -86,20 +87,44 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
     handleGenerate(preset.prompt);
   };
 
+  if (isCollapsed) {
+    return (
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs text-slate-300 hover:text-white shadow-xl backdrop-blur-md transition select-none"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>Prompt Bar (Natural Language ➔ Canvas)</span>
+          <span className="text-[10px] text-slate-500 font-mono">Expand ▾</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4 pointer-events-auto">
-      <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-3.5 transition-all focus-within:border-cyan-500/60 focus-within:ring-1 focus-within:ring-cyan-500/40">
+    <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4 pointer-events-auto select-none">
+      <div className="bg-slate-950/90 backdrop-blur-xl border border-slate-800 rounded-xl shadow-2xl p-3 transition-all focus-within:border-cyan-500/50">
         {/* Header matching Hardik's sketch */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-xs font-bold text-slate-200 uppercase tracking-wide">
               Describe what you want to build
             </span>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-cyan-400 border border-slate-700">
-            Natural Language ➔ Architecture
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-cyan-400 border border-slate-800">
+              Natural Language ➔ Architecture
+            </span>
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="text-[10px] text-slate-500 hover:text-slate-300 font-mono px-1 py-0.5 rounded hover:bg-slate-900 transition"
+              title="Collapse Prompt Bar"
+            >
+              Hide ▴
+            </button>
+          </div>
         </div>
 
         <form
