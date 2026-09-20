@@ -6,6 +6,14 @@ import { MarkerType } from '@xyflow/react';
 import type { AppNode, AppEdge, HttpMethod } from '@/types/canvas';
 import type { TeammateArchitecture, ServiceReasoning } from '@/types/compiler';
 
+function extractJsonFromText(text: string): any {
+  const trimmed = text.trim();
+  try { return JSON.parse(trimmed); } catch {}
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  if (match) return JSON.parse(match[0]);
+  throw new Error('No valid JSON found in LLM response');
+}
+
 export interface GeneratedArchitectureResponse {
   success: boolean;
   source: 'bedrock' | 'offline_rule_engine';
@@ -137,6 +145,60 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
     tableName = 'ProductsTable';
     primaryKey = 'productId';
     serviceNameDesc = 'product listings';
+  } else if (p.includes('task') || p.includes('todo') || p.includes('ticket') || p.includes('issue')) {
+    appName = 'Task Management Service';
+    appDesc = 'Serverless microservice to track, assign, and update task statuses';
+    path = '/tasks';
+    functionName = 'ManageTasksFunction';
+    businessLogic = 'Validates task payload, assigns priority and timestamps, and stores task';
+    tableName = 'TasksTable';
+    primaryKey = 'taskId';
+    serviceNameDesc = 'task items';
+  } else if (p.includes('notification') || p.includes('alert') || p.includes('email') || p.includes('sms')) {
+    appName = 'Notification Dispatch Service';
+    appDesc = 'Serverless event dispatcher to send and log user notifications';
+    path = '/notifications';
+    functionName = 'SendNotificationFunction';
+    businessLogic = 'Validates recipient channel, constructs notification payload, and logs dispatch';
+    tableName = 'NotificationsTable';
+    primaryKey = 'notificationId';
+    serviceNameDesc = 'notification logs';
+  } else if (p.includes('analytics') || p.includes('event') || p.includes('metric') || p.includes('tracking')) {
+    appName = 'Analytics Telemetry Service';
+    appDesc = 'High-throughput serverless endpoint to capture and record analytics events';
+    path = '/events';
+    functionName = 'IngestEventsFunction';
+    businessLogic = 'Enriches event metadata, extracts client IP, and persists event log';
+    tableName = 'EventsTable';
+    primaryKey = 'eventId';
+    serviceNameDesc = 'telemetry events';
+  } else if (p.includes('feedback') || p.includes('review') || p.includes('rating') || p.includes('survey')) {
+    appName = 'Customer Feedback Service';
+    appDesc = 'Serverless endpoint to capture customer feedback, ratings, and reviews';
+    path = '/feedback';
+    functionName = 'SubmitFeedbackFunction';
+    businessLogic = 'Validates rating bounds, sanitizes comment text, and stores feedback record';
+    tableName = 'FeedbackTable';
+    primaryKey = 'feedbackId';
+    serviceNameDesc = 'customer reviews';
+  } else if (p.includes('post') || p.includes('blog') || p.includes('article') || p.includes('content')) {
+    appName = 'Content Publishing Service';
+    appDesc = 'Serverless headless CMS API to publish and retrieve article posts';
+    path = '/posts';
+    functionName = 'PublishContentFunction';
+    businessLogic = 'Generates slug, verifies author credentials, and records post content';
+    tableName = 'PostsTable';
+    primaryKey = 'postId';
+    serviceNameDesc = 'published posts';
+  } else if (p.includes('booking') || p.includes('appointment') || p.includes('reservation') || p.includes('schedule')) {
+    appName = 'Booking Reservation Service';
+    appDesc = 'Serverless appointment scheduling service for reservation bookings';
+    path = '/bookings';
+    functionName = 'ManageBookingsFunction';
+    businessLogic = 'Verifies timeslot availability, locks booking reservation, and logs confirmation';
+    tableName = 'BookingsTable';
+    primaryKey = 'bookingId';
+    serviceNameDesc = 'booking records';
   }
 
   const reasoning: ServiceReasoning[] = [
@@ -263,8 +325,7 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
 
       const data = await res.json();
       const rawText = data.output?.message?.content?.[0]?.text || '';
-      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
+      const parsed = extractJsonFromText(rawText);
 
       const method = (parsed.api?.method || 'POST') as HttpMethod;
       const path = parsed.api?.path?.startsWith('/') ? parsed.api.path : `/${parsed.api?.path || 'items'}`;
@@ -314,8 +375,7 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
         canvasEdges: edges,
       };
     } catch (err) {
-      console.warn('[Bedrock Bearer] Generation failed, falling back to rule engine:', err);
-      return fallbackGenerate(prompt);
+      console.warn('[Bedrock Bearer] Generation failed, trying IAM credentials:', err);
     }
   }
 
@@ -372,8 +432,7 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
       const decodedBody = new TextDecoder().decode(response.body);
       const parsedBody = JSON.parse(decodedBody);
       const rawText = parsedBody.content?.[0]?.text || '';
-      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
+      const parsed = extractJsonFromText(rawText);
 
       const method = (parsed.api?.method || 'POST') as HttpMethod;
       const path = parsed.api?.path?.startsWith('/') ? parsed.api.path : `/${parsed.api?.path || 'items'}`;

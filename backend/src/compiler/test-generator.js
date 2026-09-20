@@ -47,11 +47,19 @@ const graph = {
 
 const template = generateSamTemplate(graph);
 
+const path = require("path");
+
+const templatePath = path.join(
+  __dirname,
+  "../../../infrastructure/generated-template.yaml",
+);
+
 const yamlTemplate = yaml.dump(template, {
   noRefs: true,
 });
 
-fs.writeFileSync("../infrastructure/generated-template.yaml", yamlTemplate);
+fs.writeFileSync(templatePath, yamlTemplate);
 
 console.log("✅ SAM template generated:");
-console.log("../infrastructure/generated-template.yaml");
+console.log(templatePath);
+

@@ -25,15 +25,15 @@ function generateSamTemplate(graph) {
 
   const database = graph.nodes.find((node) => node.type === "dynamodb");
 
-  const method = api.config?.method?.toLowerCase() || "post";
+  const method = (api.data?.method || api.config?.method || "POST").toLowerCase();
 
-  const path = api.config?.path || "/orders";
+  const path = api.data?.path || api.config?.path || "/orders";
 
-  const functionName = lambda.config?.functionName || "NapkinCloudFunction";
+  const functionName = lambda.data?.functionName || lambda.config?.functionName || "NapkinCloudFunction";
 
-  const tableName = database.config?.tableName || "NapkinCloudTable";
+  const tableName = database.data?.tableName || database.config?.tableName || "NapkinCloudTable";
 
-  const partitionKey = database.config?.partitionKey || "id";
+  const partitionKey = database.data?.primaryKey || database.config?.partitionKey || "id";
 
   const template = {
     AWSTemplateFormatVersion: "2010-09-09",
@@ -44,7 +44,7 @@ function generateSamTemplate(graph) {
 
     Globals: {
       Function: {
-        Runtime: "nodejs22.x",
+        Runtime: "nodejs20.x",
         Timeout: 10,
       },
     },
@@ -55,6 +55,11 @@ function generateSamTemplate(graph) {
 
         Properties: {
           StageName: "prod",
+          Cors: {
+            AllowMethods: "'*'",
+            AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+            AllowOrigin: "'*'"
+          }
         },
       },
 
@@ -136,7 +141,7 @@ function generateSamTemplate(graph) {
     Description: "Deployed API endpoint",
     Value: {
       "Fn::Sub":
-        "https://${OrdersApi}.execute-api.${AWS::Region}.amazonaws.com/prod/orders"
+        "https://${OrdersApi}.execute-api.${AWS::Region}.amazonaws.com/prod" + path
     }
   },
 

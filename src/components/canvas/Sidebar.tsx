@@ -26,6 +26,7 @@ interface ComponentItem {
   bgColor: string;
   borderColor: string;
   enabled: boolean;
+  core: boolean;
 }
 
 const components: ComponentItem[] = [
@@ -38,6 +39,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-cyan-500/10',
     borderColor: 'border-cyan-500/20 hover:border-cyan-500/50',
     enabled: true,
+    core: true,
   },
   {
     type: 'lambda',
@@ -48,6 +50,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/20 hover:border-amber-500/50',
     enabled: true,
+    core: true,
   },
   {
     type: 'dynamodb',
@@ -58,6 +61,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-indigo-500/10',
     borderColor: 'border-indigo-500/20 hover:border-indigo-500/50',
     enabled: true,
+    core: true,
   },
   {
     type: 's3',
@@ -68,6 +72,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-emerald-500/10',
     borderColor: 'border-emerald-500/20 hover:border-emerald-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'sqs',
@@ -78,6 +83,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-pink-500/10',
     borderColor: 'border-pink-500/20 hover:border-pink-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'sns',
@@ -88,6 +94,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-rose-500/10',
     borderColor: 'border-rose-500/20 hover:border-rose-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'eventbridge',
@@ -98,6 +105,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-purple-500/10',
     borderColor: 'border-purple-500/20 hover:border-purple-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'cognito',
@@ -108,6 +116,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-violet-500/10',
     borderColor: 'border-violet-500/20 hover:border-violet-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'cloudwatch',
@@ -118,6 +127,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/20 hover:border-orange-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'kinesis',
@@ -128,6 +138,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-sky-500/10',
     borderColor: 'border-sky-500/20 hover:border-sky-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'step_functions',
@@ -138,6 +149,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-fuchsia-500/10',
     borderColor: 'border-fuchsia-500/20 hover:border-fuchsia-500/50',
     enabled: true,
+    core: false,
   },
   {
     type: 'secrets_manager',
@@ -148,6 +160,7 @@ const components: ComponentItem[] = [
     bgColor: 'bg-teal-500/10',
     borderColor: 'border-teal-500/20 hover:border-teal-500/50',
     enabled: true,
+    core: false,
   },
 ];
 
@@ -198,7 +211,11 @@ export default function Sidebar() {
 
         {/* Scrollable Palette List */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-1.5 min-h-0">
-          {components.map((item) => (
+          {/* Core Pipeline */}
+          <div className="mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/70 px-1 block mb-1">Core Pipeline</span>
+          </div>
+          {components.filter(item => item.core).map((item) => (
             <div
               key={item.type}
               draggable={item.enabled}
@@ -216,12 +233,39 @@ export default function Sidebar() {
               </div>
             </div>
           ))}
+
+          {/* Divider */}
+          <div className="my-2 border-t border-[#222222]" />
+
+          {/* Extended Services */}
+          <div className="mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#666666] px-1 block mb-1">Extended Services</span>
+          </div>
+          {components.filter(item => !item.core).map((item) => (
+            <div
+              key={item.type}
+              draggable={item.enabled}
+              onDragStart={(e) => item.enabled && onDragStart(e, item.type)}
+              className="flex items-center gap-2.5 p-2 rounded-lg border transition-all duration-150 cursor-grab active:cursor-grabbing bg-[#121212]/90 border-[#222222] hover:border-[#383838] hover:bg-[#181818] active:scale-[0.98]"
+            >
+              <div className={`p-1.5 rounded-md ${item.bgColor} ${item.iconColor} shrink-0`}>
+                {item.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium text-[#EDEDED] truncate block">
+                  {item.label}
+                </span>
+                <p className="text-[10px] text-[#888888] truncate">{item.subLabel}</p>
+              </div>
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-[#1A1A1A] text-[#555555] border border-[#262626] shrink-0 uppercase tracking-wider">Soon</span>
+            </div>
+          ))}
         </div>
       </div>
 
       <div className="pt-2.5 mt-2 border-t border-[#222222] flex items-center justify-between text-[10px] font-mono text-[#666666] shrink-0">
-        <span>12 Cloud Blocks</span>
-        <span className="text-emerald-400 font-medium">All Available</span>
+        <span>3 Core + 9 Extended</span>
+        <span className="text-emerald-400 font-medium">Core Ready</span>
       </div>
     </aside>
   );

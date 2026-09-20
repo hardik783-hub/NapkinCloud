@@ -36,6 +36,26 @@ const PRESET_PROMPTS = [
     prompt: 'Microservice to manage product inventory items with price and SKU count',
     emoji: '🏷️',
   },
+  {
+    label: 'Task Management',
+    prompt: 'REST API to create, assign, and track project tasks and issues',
+    emoji: '📋',
+  },
+  {
+    label: 'Notification Dispatch',
+    prompt: 'Serverless alert system to dispatch email and push notifications',
+    emoji: '🔔',
+  },
+  {
+    label: 'Analytics Events',
+    prompt: 'High-throughput endpoint to ingest user analytics and telemetry events',
+    emoji: '📊',
+  },
+  {
+    label: 'Booking & Reservation',
+    prompt: 'Booking system to manage customer reservations and schedule appointments',
+    emoji: '📅',
+  },
 ];
 
 export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarProps) {

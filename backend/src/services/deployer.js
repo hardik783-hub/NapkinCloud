@@ -11,9 +11,9 @@ const {
   waitUntilStackCreateComplete,
 } = require("@aws-sdk/client-cloudformation");
 
-const REGION = "us-east-1";
+const REGION = process.env.AWS_REGION || "us-east-1";
 
-const BUCKET = "aws-sam-cli-managed-default-samclisourcebucket-67tausw1jwyw";
+const BUCKET = process.env.NAPKIN_S3_BUCKET || "aws-sam-cli-managed-default-samclisourcebucket-67tausw1jwyw";
 
 const s3 = new S3Client({
   region: REGION,

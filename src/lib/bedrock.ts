@@ -5,6 +5,14 @@ import {
 import type { AppNode } from '@/types/canvas';
 import type { NormalizedArchitecture } from '@/types/compiler';
 
+function extractJsonFromText(text: string): any {
+  const trimmed = text.trim();
+  try { return JSON.parse(trimmed); } catch {}
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  if (match) return JSON.parse(match[0]);
+  throw new Error('No valid JSON found in LLM response');
+}
+
 export async function normalizeIntentWithBedrock(
   validatedNodes: { api: AppNode; lambda: AppNode; dynamodb: AppNode }
 ): Promise<NormalizedArchitecture> {
@@ -66,8 +74,7 @@ Do not include markdown or backticks. Return raw JSON only.`;
       if (res.ok) {
         const data = await res.json();
         const content = data.output?.message?.content?.[0]?.text?.trim() || '';
-        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
+        const parsed = extractJsonFromText(content);
 
         return {
           pattern: 'api_lambda_dynamodb',
@@ -136,8 +143,7 @@ Do not include markdown or backticks. Return raw JSON only.`;
       const jsonResponse = JSON.parse(decoded);
       const content = jsonResponse.content?.[0]?.text?.trim() || '';
 
-      const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const parsed = extractJsonFromText(content);
 
       return {
         pattern: 'api_lambda_dynamodb',

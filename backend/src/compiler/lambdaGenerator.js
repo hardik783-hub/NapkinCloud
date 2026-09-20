@@ -1,11 +1,11 @@
 function generateLambdaCode(lambdaNode, databaseNode) {
-  const functionName = lambdaNode.config?.functionName || "NapkinCloudFunction";
+  const functionName = lambdaNode.data?.functionName || lambdaNode.config?.functionName || "NapkinCloudFunction";
 
-  const logic = lambdaNode.config?.logic || "Process the incoming request";
+  const logic = lambdaNode.data?.businessLogic || lambdaNode.config?.logic || "Process the incoming request";
 
-  const tableName = databaseNode?.config?.tableName || "NapkinCloudTable";
+  const tableName = databaseNode?.data?.tableName || databaseNode?.config?.tableName || "NapkinCloudTable";
 
-  const partitionKey = databaseNode?.config?.partitionKey || "id";
+  const partitionKey = databaseNode?.data?.primaryKey || databaseNode?.config?.partitionKey || "id";
 
   return `const {
   DynamoDBClient
@@ -13,7 +13,9 @@ function generateLambdaCode(lambdaNode, databaseNode) {
 
 const {
   DynamoDBDocumentClient,
-  PutCommand
+  PutCommand,
+  ScanCommand,
+  DeleteCommand
 } = require("@aws-sdk/lib-dynamodb");
 
 const {
@@ -26,7 +28,71 @@ const dynamodb =
   DynamoDBDocumentClient.from(client);
 
 exports.handler = async (event) => {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+    "Access-Control-Allow-Methods": "*"
+  };
+
+  const httpMethod = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || "POST").toUpperCase();
+
+  if (httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: ""
+    };
+  }
+
   try {
+    if (httpMethod === "GET") {
+      const scanResult = await dynamodb.send(
+        new ScanCommand({
+          TableName: process.env.TABLE_NAME,
+          Limit: 50
+        })
+      );
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          count: scanResult.Items ? scanResult.Items.length : 0,
+          items: scanResult.Items || []
+        })
+      };
+    }
+
+    if (httpMethod === "DELETE") {
+      const queryKey = event.queryStringParameters && event.queryStringParameters["${partitionKey}"];
+      let bodyKey = null;
+      try {
+        const parsed = JSON.parse(event.body || "{}");
+        bodyKey = parsed["${partitionKey}"];
+      } catch (_) {}
+
+      const targetId = queryKey || bodyKey;
+      if (targetId) {
+        await dynamodb.send(
+          new DeleteCommand({
+            TableName: process.env.TABLE_NAME,
+            Key: {
+              ["${partitionKey}"]: targetId
+            }
+          })
+        );
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: true,
+            message: "Record deleted",
+            deletedId: targetId
+          })
+        };
+      }
+    }
+
     const body =
       JSON.parse(event.body || "{}");
 
@@ -34,37 +100,27 @@ exports.handler = async (event) => {
     // Function: ${functionName}
     // Logic: ${logic}
 
-    if (!body.item || !body.qty) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          error: "item and qty are required"
-        })
-      };
-    }
+    const pkValue = body["${partitionKey}"] || randomUUID();
+    const now = new Date().toISOString();
 
-    const ${partitionKey} = randomUUID();
+    const record = {
+      ...body,
+      ["${partitionKey}"]: pkValue,
+      createdAt: now,
+      updatedAt: now
+    };
 
     await dynamodb.send(
       new PutCommand({
         TableName: process.env.TABLE_NAME,
-
-        Item: {
-          ${partitionKey},
-          item: body.item,
-          qty: Number(body.qty),
-          status: "created"
-        }
+        Item: record
       })
     );
 
     return {
       statusCode: 201,
-
-      body: JSON.stringify({
-        ${partitionKey},
-        status: "created"
-      })
+      headers: corsHeaders,
+      body: JSON.stringify(record)
     };
 
   } catch (error) {
@@ -75,9 +131,9 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 500,
-
+      headers: corsHeaders,
       body: JSON.stringify({
-        error: "Internal server error"
+        error: error.message || "Internal server error"
       })
     };
   }

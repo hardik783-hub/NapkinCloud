@@ -36,6 +36,11 @@ export default function ApiTesterDrawer({
   const [copied, setCopied] = useState(false);
 
   const handleSend = async () => {
+    if (!apiData.liveUrl) {
+      setResponseResult({ success: false, statusCode: 0, error: 'No live URL available. Deploy the architecture first.' });
+      return;
+    }
+
     setIsLoading(true);
     setResponseResult(null);
 
@@ -122,7 +127,7 @@ export default function ApiTesterDrawer({
             {apiData.method}
           </span>
           <span className="flex-1 text-[#D4D4D4] truncate">
-            {apiData.liveUrl || `https://api.napkincloud.live/prod${apiData.path}`}
+            {apiData.liveUrl || '— Deploy architecture to get live URL'}
           </span>
         </div>
 
@@ -145,7 +150,7 @@ export default function ApiTesterDrawer({
         {/* Action Button */}
         <button
           onClick={handleSend}
-          disabled={isLoading}
+          disabled={isLoading || !apiData.liveUrl}
           className="w-full py-2.5 rounded-lg text-xs font-bold bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-[#0A0A0A] flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-50"
         >
           {isLoading ? (

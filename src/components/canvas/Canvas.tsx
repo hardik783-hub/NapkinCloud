@@ -29,6 +29,7 @@ import CompilationModal from './CompilationModal';
 import DemoHelperHud from './DemoHelperHud';
 import ApiTesterDrawer from './drawers/ApiTesterDrawer';
 import DynamoDbDrawer from './drawers/DynamoDbDrawer';
+import Toast from './Toast';
 import type { AppNode, AppEdge, NodeStatus, ApiGatewayNodeData, DynamoDbNodeData } from '@/types/canvas';
 import type { CompileResponse, ServiceReasoning } from '@/types/compiler';
 
@@ -94,6 +95,7 @@ function CanvasInner() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>(initialEdges);
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'warning' | 'error' | 'success' } | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [compilationResult, setCompilationResult] = useState<CompileResponse | null>(null);
@@ -115,6 +117,7 @@ function CanvasInner() {
       newReasoning: ServiceReasoning[],
       appData: { name: string; description: string }
     ) => {
+      idCounter = 2;
       setNodes(newNodes);
       setEdges(newEdges);
       setReasoning(newReasoning);
@@ -184,6 +187,7 @@ function CanvasInner() {
   );
 
   const handleResetCanvas = useCallback(() => {
+    idCounter = 2;
     setNodes(initialNodes);
     setEdges(initialEdges);
     setIsLive(false);
@@ -193,13 +197,12 @@ function CanvasInner() {
   }, [setEdges, setNodes]);
    
 const handleJumpToLive = useCallback(() => {
-  if (!isLive) {
-    alert('⚡ Deploy the architecture first.');
-    return;
-  }
-
-  setAllNodeStatuses('live');
-}, [isLive, setAllNodeStatuses]);
+  setAllNodeStatuses('live', {
+    liveUrl: 'https://demo.execute-api.us-east-1.amazonaws.com/prod/orders',
+  });
+  setIsLive(true);
+  setToast({ message: '🟢 Demo mode: All nodes set to LIVE', type: 'success' });
+}, [setAllNodeStatuses]);
 
   const isValidConnection = useCallback(
     (connection: Edge | Connection) => {
@@ -375,7 +378,7 @@ const handleJumpToLive = useCallback(() => {
   } catch (err: any) {
     console.error('❌ Compile failed:', err);
 
-    alert(`⚠️ [AWS Deployment Failed]\n\nReason:\n${err.message}`);
+    setToast({ message: `AWS Deployment Failed: ${err.message}`, type: 'error' });
 
     setAllNodeStatuses('failed');
     setIsLive(false);
@@ -395,7 +398,7 @@ const handleJumpToLive = useCallback(() => {
           setActiveDrawer('dynamodb');
         }
       } else {
-        alert('⚡ Click "Compile to AWS" first to deploy and activate live testing on this node!');
+        setToast({ message: 'Deploy the architecture first to activate live testing on this node', type: 'info' });
       }
     },
     []
@@ -504,6 +507,14 @@ const handleJumpToLive = useCallback(() => {
           application={application}
           reasoning={reasoning}
           onClose={() => setShowExplainer(false)}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </div>

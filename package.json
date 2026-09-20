@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:backend": "node backend/src/compiler/test-validator.js && node backend/src/compiler/test-generator.js && node backend/src/compiler/test-lambda-generator.js && node backend/src/compiler/test-compiler.js",
     "test:e2e": "node --experimental-strip-types scripts/verify-e2e.ts"
   },
   "dependencies": {

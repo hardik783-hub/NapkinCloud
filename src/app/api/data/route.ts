@@ -11,6 +11,25 @@ const dynamodb = new DynamoDBClient({
   region: REGION,
 });
 
+function unmarshallValue(value: any): any {
+  if (value.S !== undefined) return value.S;
+  if (value.N !== undefined) return Number(value.N);
+  if (value.BOOL !== undefined) return value.BOOL;
+  if (value.NULL !== undefined) return null;
+  if (value.L !== undefined) return (value.L as any[]).map(unmarshallValue);
+  if (value.M !== undefined) {
+    const obj: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value.M as Record<string, any>)) {
+      obj[k] = unmarshallValue(v);
+    }
+    return obj;
+  }
+  if (value.SS !== undefined) return value.SS;
+  if (value.NS !== undefined) return (value.NS as string[]).map(Number);
+  if (value.BS !== undefined) return value.BS;
+  return String(value);
+}
+
 export async function GET(req: Request) {
   let tableName: string | undefined;
 
@@ -39,14 +58,9 @@ export async function GET(req: Request) {
 
     const items = (result.Items || []).map((item) => {
       const converted: Record<string, any> = {};
-
       for (const [key, value] of Object.entries(item)) {
-        if (value.S !== undefined) converted[key] = value.S;
-        else if (value.N !== undefined) converted[key] = Number(value.N);
-        else if (value.BOOL !== undefined) converted[key] = value.BOOL;
-        else if (value.NULL !== undefined) converted[key] = null;
+        converted[key] = unmarshallValue(value);
       }
-
       return converted;
     });
 
