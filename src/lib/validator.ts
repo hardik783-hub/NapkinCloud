@@ -29,8 +29,23 @@ export function validateGraphTopology(
     errors.push(`P0 supports 1 DynamoDB table (found ${dynamoNodes.length}).`);
   }
 
+  const validCloudTypes = [
+    'api_gateway',
+    'lambda',
+    'dynamodb',
+    's3',
+    'sqs',
+    'sns',
+    'eventbridge',
+    'cognito',
+    'cloudwatch',
+    'kinesis',
+    'step_functions',
+    'secrets_manager',
+  ];
+
   const unsupported = nodes.filter(
-    (n) => !['api_gateway', 'lambda', 'dynamodb'].includes(n.type || '')
+    (n) => !validCloudTypes.includes(n.type || '')
   );
   if (unsupported.length > 0) {
     errors.push(`Unsupported component types in graph: ${unsupported.map((n) => n.type).join(', ')}`);
@@ -58,10 +73,10 @@ export function validateGraphTopology(
     errors.push(`Lambda function [${lambda.id}] must connect to DynamoDB table [${dynamo.id}].`);
   }
 
-  // Check for orphan edges
-  const validNodeIds = new Set([api.id, lambda.id, dynamo.id]);
+  // Check for orphan edges (edges pointing to non-existent nodes)
+  const allNodeIds = new Set(nodes.map((n) => n.id));
   const orphanEdges = edges.filter(
-    (e) => !validNodeIds.has(e.source) || !validNodeIds.has(e.target)
+    (e) => !allNodeIds.has(e.source) || !allNodeIds.has(e.target)
   );
   if (orphanEdges.length > 0) {
     errors.push(`Found ${orphanEdges.length} disconnected edge(s).`);

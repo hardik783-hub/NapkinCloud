@@ -20,6 +20,7 @@ import {
 import ApiGatewayNode from './nodes/ApiGatewayNode';
 import LambdaNode from './nodes/LambdaNode';
 import DynamoDbNode from './nodes/DynamoDbNode';
+import GenericCloudNode from './nodes/GenericCloudNode';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import PromptBar from './PromptBar';
@@ -135,6 +136,15 @@ function CanvasInner() {
       api_gateway: ApiGatewayNode,
       lambda: LambdaNode,
       dynamodb: DynamoDbNode,
+      s3: GenericCloudNode,
+      sqs: GenericCloudNode,
+      sns: GenericCloudNode,
+      eventbridge: GenericCloudNode,
+      cognito: GenericCloudNode,
+      cloudwatch: GenericCloudNode,
+      kinesis: GenericCloudNode,
+      step_functions: GenericCloudNode,
+      secrets_manager: GenericCloudNode,
     }),
     []
   );
@@ -195,31 +205,29 @@ const handleJumpToLive = useCallback(() => {
     (connection: Edge | Connection) => {
       if (!connection.source || !connection.target) return false;
       if (connection.source === connection.target) return false;
-
-      const sourceNode = nodes.find((n) => n.id === connection.source);
-      const targetNode = nodes.find((n) => n.id === connection.target);
-
-      if (!sourceNode || !targetNode) return false;
-
-      // Rule 1: API Gateway -> Lambda only
-      if (sourceNode.type === 'api_gateway') {
-        return targetNode.type === 'lambda';
-      }
-
-      // Rule 2: Lambda -> DynamoDB only
-      if (sourceNode.type === 'lambda') {
-        return targetNode.type === 'dynamodb';
-      }
-
-      return false;
+      return true;
     },
-    [nodes]
+    []
   );
 
   const onConnect = useCallback(
     (params: Connection) => {
       const sourceNode = nodes.find((n) => n.id === params.source);
-      const edgeColor = sourceNode?.type === 'api_gateway' ? '#06b6d4' : '#f59e0b';
+      const edgeColors: Record<string, string> = {
+        api_gateway: '#06b6d4',
+        lambda: '#f59e0b',
+        dynamodb: '#6366f1',
+        s3: '#10b981',
+        sqs: '#ec4899',
+        sns: '#f43f5e',
+        eventbridge: '#a855f7',
+        cognito: '#8b5cf6',
+        cloudwatch: '#f97316',
+        kinesis: '#38bdf8',
+        step_functions: '#d946ef',
+        secrets_manager: '#14b8a6',
+      };
+      const edgeColor = edgeColors[sourceNode?.type || ''] || '#06b6d4';
 
       setEdges((eds) =>
         addEdge(
@@ -294,7 +302,28 @@ const handleJumpToLive = useCallback(() => {
           },
         };
       } else {
-        return;
+        const labels: Record<string, string> = {
+          s3: 'AWS S3 Bucket',
+          sqs: 'AWS SQS Queue',
+          sns: 'AWS SNS Topic',
+          eventbridge: 'EventBridge Bus',
+          cognito: 'Cognito User Pool',
+          cloudwatch: 'CloudWatch Alarms',
+          kinesis: 'Kinesis Stream',
+          step_functions: 'Step Functions',
+          secrets_manager: 'Secrets Manager',
+        };
+
+        newNode = {
+          id: `node-${nodeType}-${currentCount}`,
+          type: nodeType,
+          position,
+          data: {
+            label: labels[nodeType] || nodeType.toUpperCase(),
+            serviceType: nodeType,
+            status: isLive ? 'live' : 'draft',
+          },
+        };
       }
 
       setNodes((nds) => nds.concat(newNode));

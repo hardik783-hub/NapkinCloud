@@ -30,9 +30,22 @@ export interface DynamoDbNodeData extends Record<string, unknown> {
   liveTableName?: string;
 }
 
+export interface GenericCloudNodeData extends Record<string, unknown> {
+  label: string;
+  serviceType: string;
+  resourceName?: string;
+  subLabel?: string;
+  status: NodeStatus;
+  arn?: string;
+  propertyKey?: string;
+  propertyValue?: string;
+}
+
 export type ApiGatewayNode = Node<ApiGatewayNodeData, 'api_gateway'>;
 export type LambdaNode = Node<LambdaNodeData, 'lambda'>;
 export type DynamoDbNode = Node<DynamoDbNodeData, 'dynamodb'>;
+export type GenericCloudNode = Node<GenericCloudNodeData, string>;
 
-export type AppNode = ApiGatewayNode | LambdaNode | DynamoDbNode;
+export type AppNode = ApiGatewayNode | LambdaNode | DynamoDbNode | GenericCloudNode;
 export type AppEdge = Edge;
+

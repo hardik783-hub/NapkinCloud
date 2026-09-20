@@ -1,4 +1,17 @@
-const SUPPORTED_NODE_TYPES = ["api_gateway", "lambda", "dynamodb", "s3", "sqs"];
+const SUPPORTED_NODE_TYPES = [
+  "api_gateway",
+  "lambda",
+  "dynamodb",
+  "s3",
+  "sqs",
+  "sns",
+  "eventbridge",
+  "cognito",
+  "cloudwatch",
+  "kinesis",
+  "step_functions",
+  "secrets_manager",
+];
 
 function validateGraph(graph) {
   const errors = [];
