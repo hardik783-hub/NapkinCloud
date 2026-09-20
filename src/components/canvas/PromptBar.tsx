@@ -182,8 +182,18 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
 
         {/* Status indicator toast */}
         {statusMessage && (
-          <div className="mt-2 pt-1.5 flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+          <div
+            className={`mt-2 pt-1.5 flex items-center gap-1.5 text-xs font-medium ${
+              statusMessage.toLowerCase().includes('error') || statusMessage.toLowerCase().includes('fail')
+                ? 'text-rose-400'
+                : 'text-emerald-400'
+            }`}
+          >
+            {statusMessage.toLowerCase().includes('error') || statusMessage.toLowerCase().includes('fail') ? (
+              <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            )}
             <span>{statusMessage}</span>
           </div>
         )}
