@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bot, ChevronDown, ChevronUp, Sparkles, X, Layers, ShieldCheck } from 'lucide-react';
+import { Bot, ChevronDown, ChevronUp, Sparkles, X, ShieldCheck, Copy, Check } from 'lucide-react';
 import type { ServiceReasoning } from '@/types/compiler';
 
 interface ArchitectExplainerCardProps {
@@ -19,6 +19,7 @@ export default function ArchitectExplainerCard({
   onClose,
 }: ArchitectExplainerCardProps) {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const defaultReasoning: ServiceReasoning[] = [
     {
@@ -37,23 +38,32 @@ export default function ArchitectExplainerCard({
 
   const activeReasoning = reasoning && reasoning.length > 0 ? reasoning : defaultReasoning;
 
+  const handleCopyReasoning = () => {
+    const text = activeReasoning
+      .map((r) => `• ${r.service.toUpperCase()}: ${r.reason}`)
+      .join('\n');
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
   return (
-    <div className="absolute bottom-6 right-6 z-30 max-w-sm w-full pointer-events-auto animate-fadeIn">
-      <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+    <div className="absolute bottom-5 right-6 z-30 max-w-sm w-full pointer-events-auto select-none animate-fadeIn">
+      <div className="relative bg-slate-950/95 backdrop-blur-xl border border-slate-800/90 rounded-xl shadow-2xl overflow-hidden transition-all duration-300 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-purple-500/30 before:to-transparent">
         {/* Header */}
-        <div className="p-3.5 bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-3.5 py-3 bg-slate-900/60 border-b border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center">
               <Bot className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-white tracking-tight">AI Cloud Architect</span>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="text-xs font-semibold text-slate-100 tracking-tight font-sans">AI Architect</span>
+                <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
                   Bedrock Agent
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[10px] text-slate-400 font-sans truncate max-w-[170px]">
                 {application?.name || 'Order Processing Service'}
               </p>
             </div>
@@ -62,20 +72,28 @@ export default function ArchitectExplainerCard({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setIsMinimized(!isMinimized)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-              title={isMinimized ? 'Expand explanation' : 'Minimize explanation'}
+              onClick={handleCopyReasoning}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition active:scale-95"
+              title={copied ? 'Copied to clipboard' : 'Copy architecture reasoning'}
             >
-              {isMinimized ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsMinimized(!isMinimized)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition active:scale-95"
+              title={isMinimized ? 'Expand' : 'Minimize'}
+            >
+              {isMinimized ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition active:scale-95"
                 title="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -83,39 +101,39 @@ export default function ArchitectExplainerCard({
 
         {/* Body */}
         {!isMinimized && (
-          <div className="p-3.5 space-y-3 text-xs">
-            <div className="flex items-start gap-2 text-slate-300 text-[11px] leading-relaxed bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+          <div className="p-3.5 space-y-2.5 text-xs select-text">
+            <div className="flex items-start gap-2 text-slate-300 text-[11px] leading-relaxed bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/70">
               <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-              <span>
-                {application?.description || 'Here is the AWS Serverless architecture designed for your use-case:'}
+              <span className="font-sans">
+                {application?.description || 'AWS Serverless topology synthesized for sub-10ms transactional execution:'}
               </span>
             </div>
 
             <div className="space-y-2">
               {activeReasoning.map((item, idx) => {
-                const serviceColor = {
-                  api_gateway: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-                  lambda: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-                  dynamodb: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
-                }[item.service] || 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+                const serviceBadge = {
+                  api_gateway: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/25',
+                  lambda: 'text-amber-400 bg-amber-500/10 border-amber-500/25',
+                  dynamodb: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/25',
+                }[item.service] || 'text-purple-400 bg-purple-500/10 border-purple-500/25';
 
                 const serviceTitle = {
-                  api_gateway: 'API Gateway (Trigger)',
-                  lambda: 'AWS Lambda (Compute)',
-                  dynamodb: 'DynamoDB (Storage)',
+                  api_gateway: 'API Gateway · Ingress',
+                  lambda: 'AWS Lambda · Compute',
+                  dynamodb: 'DynamoDB · Storage',
                 }[item.service] || item.service;
 
                 return (
                   <div
                     key={idx}
-                    className="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/70 hover:border-slate-700 transition"
+                    className="p-2.5 rounded-lg bg-slate-900/40 border border-slate-800/70 hover:border-slate-700/80 transition-colors"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${serviceColor}`}>
+                      <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${serviceBadge}`}>
                         {serviceTitle}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-300 leading-relaxed pl-1">
+                    <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
                       {item.reason}
                     </p>
                   </div>
@@ -123,12 +141,12 @@ export default function ArchitectExplainerCard({
               })}
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+            <div className="pt-2 border-t border-slate-800/70 flex items-center justify-between text-[10px] text-slate-400 font-mono">
               <span className="flex items-center gap-1 text-emerald-400">
                 <ShieldCheck className="w-3 h-3" />
                 <span>Deterministic P0 Stack</span>
               </span>
-              <span>Ready to Compile</span>
+              <span className="text-slate-500">SAM Ready</span>
             </div>
           </div>
         )}

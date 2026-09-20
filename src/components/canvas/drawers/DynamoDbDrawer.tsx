@@ -62,12 +62,12 @@ export default function DynamoDbDrawer({
   const pkName = dbData.primaryKey || 'orderId';
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 z-40 w-full max-w-xl bg-slate-900/95 backdrop-blur-2xl border-l border-slate-800 shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-300">
+    <div className="fixed right-0 top-14 bottom-0 z-40 w-full max-w-xl bg-slate-950/98 backdrop-blur-2xl border-l border-slate-800 shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-200 select-none">
       {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-            <Database className="w-5 h-5" />
+      <div className="flex items-center justify-between p-4 border-b border-slate-800/80">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <Database className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">

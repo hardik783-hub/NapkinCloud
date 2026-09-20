@@ -85,12 +85,12 @@ export default function ApiTesterDrawer({
   };
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 z-40 w-full max-w-lg bg-slate-900/95 backdrop-blur-2xl border-l border-slate-800 shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-300">
+    <div className="fixed right-0 top-14 bottom-0 z-40 w-full max-w-lg bg-slate-950/98 backdrop-blur-2xl border-l border-slate-800 shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-200 select-none">
       {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            <Globe className="w-5 h-5" />
+      <div className="flex items-center justify-between p-4 border-b border-slate-800/80">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <Globe className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export default function ApiTesterDrawer({
         <button
           onClick={handleSend}
           disabled={isLoading}
-          className="w-full py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(6,182,212,0.35)] transition"
+          className="w-full py-2.5 rounded-lg text-xs font-bold bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 flex items-center justify-center gap-2 shadow-sm transition disabled:opacity-50"
         >
           {isLoading ? (
             <>
