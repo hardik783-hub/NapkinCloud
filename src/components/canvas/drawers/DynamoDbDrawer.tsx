@@ -62,30 +62,30 @@ export default function DynamoDbDrawer({
   const pkName = dbData.primaryKey || 'orderId';
 
   return (
-    <div className="fixed right-0 top-14 bottom-0 z-40 w-full max-w-xl bg-slate-950/98 backdrop-blur-2xl border-l border-slate-800 shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-200 select-none">
+    <div className="fixed right-0 top-14 bottom-0 z-40 w-full max-w-xl bg-[#0A0A0A]/98 backdrop-blur-2xl border-l border-[#222222] shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-200 select-none">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-800/80">
+      <div className="flex items-center justify-between p-4 border-b border-[#222222]">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
             <Database className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-[#EDEDED] uppercase tracking-wider">
                 DynamoDB Inspector
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
                 LIVE TABLE
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-mono">
+            <p className="text-xs text-[#888888] font-mono">
               Table:{' '}
 <span className="text-indigo-400 font-bold">
   {dbData.tableName}
 </span>
 
 {dbData.liveTableName && (
-  <span className="text-slate-500 block text-[10px] mt-1 truncate">
+  <span className="text-[#666666] block text-[10px] mt-1 truncate">
     AWS: {dbData.liveTableName}
   </span>
 )} ({pkName})
@@ -96,14 +96,14 @@ export default function DynamoDbDrawer({
           <button
             onClick={fetchRecords}
             disabled={isLoading}
-            className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+            className="p-2 rounded-lg bg-[#141414] text-[#888888] hover:text-[#EDEDED] hover:bg-[#1E1E1E] border border-[#222222] transition"
             title="Refresh Table Data"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-[#888888] hover:text-[#EDEDED] hover:bg-[#1C1C1C] transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -111,17 +111,17 @@ export default function DynamoDbDrawer({
       </div>
 
       {/* Summary Stats */}
-      <div className="p-5 pb-3 grid grid-cols-3 gap-3 border-b border-slate-800">
-        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Items</span>
-          <span className="text-lg font-bold text-white font-mono">{items.length}</span>
+      <div className="p-5 pb-3 grid grid-cols-3 gap-3 border-b border-[#222222]">
+        <div className="p-2.5 rounded-xl bg-[#050505] border border-[#202020]">
+          <span className="text-[10px] uppercase font-mono text-[#888888] block">Total Items</span>
+          <span className="text-lg font-bold text-[#EDEDED] font-mono">{items.length}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block">Partition Key</span>
+        <div className="p-2.5 rounded-xl bg-[#050505] border border-[#202020]">
+          <span className="text-[10px] uppercase font-mono text-[#888888] block">Partition Key</span>
           <span className="text-xs font-bold text-indigo-400 font-mono truncate block mt-1">{pkName}</span>
         </div>
-        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-          <span className="text-[10px] uppercase font-mono text-slate-400 block">Billing Mode</span>
+        <div className="p-2.5 rounded-xl bg-[#050505] border border-[#202020]">
+          <span className="text-[10px] uppercase font-mono text-[#888888] block">Billing Mode</span>
           <span className="text-xs font-bold text-emerald-400 font-mono block mt-1">PAY_PER_REQUEST</span>
         </div>
       </div>
@@ -134,10 +134,10 @@ export default function DynamoDbDrawer({
           </div>
         )}
         {items.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-800 rounded-2xl">
-            <Layers className="w-8 h-8 text-slate-600 mb-2" />
-            <p className="text-sm font-semibold text-slate-300">No records in this table yet</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs">
+          <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-[#222222] rounded-2xl">
+            <Layers className="w-8 h-8 text-[#555555] mb-2" />
+            <p className="text-sm font-semibold text-[#D4D4D4]">No records in this table yet</p>
+            <p className="text-xs text-[#666666] mt-1 max-w-xs">
               Click the API Gateway node on the canvas to open the API Tester and fire a live request!
             </p>
           </div>
@@ -149,8 +149,8 @@ export default function DynamoDbDrawer({
                 onClick={() => setSelectedRecord(row === selectedRecord ? null : row)}
                 className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                   selectedRecord === row
-                    ? 'bg-slate-800/80 border-indigo-500 ring-1 ring-indigo-500'
-                    : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
+                    ? 'bg-[#141414] border-indigo-500/80 ring-1 ring-indigo-500/40'
+                    : 'bg-[#0E0E0E] border-[#202020] hover:border-[#333333] hover:bg-[#121212]'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
@@ -158,7 +158,7 @@ export default function DynamoDbDrawer({
                     {row[pkName] || `item-${idx}`}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">
+                    <span className="text-[10px] font-mono text-[#666666]">
                       {row.createdAt ? new Date(row.createdAt).toLocaleTimeString() : 'Just now'}
                     </span>
                     <span className="flex items-center gap-1 text-[9px] font-mono uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
@@ -168,18 +168,18 @@ export default function DynamoDbDrawer({
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-300 font-medium">
+                <div className="text-xs text-[#D4D4D4] font-medium">
                   {row.item ? (
-                    <span>Item: <strong className="text-white">{row.item}</strong></span>
+                    <span>Item: <strong className="text-[#EDEDED]">{row.item}</strong></span>
                   ) : (
                     <span>Payload: {Object.keys(row).filter((k) => !k.startsWith('_')).slice(0, 3).join(', ')}</span>
                   )}
                   {row.price && <span className="ml-2 text-emerald-400 font-mono">${row.price}</span>}
-                  {row.qty && <span className="ml-2 text-slate-400">×{row.qty}</span>}
+                  {row.qty && <span className="ml-2 text-[#888888]">×{row.qty}</span>}
                 </div>
 
                 {selectedRecord === row && (
-                  <pre className="mt-3 p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-auto max-h-40">
+                  <pre className="mt-3 p-3 rounded-lg bg-[#050505] border border-[#202020] text-[11px] font-mono text-cyan-300 overflow-auto max-h-40">
                     {JSON.stringify(row, null, 2)}
                   </pre>
                 )}
@@ -190,12 +190,12 @@ export default function DynamoDbDrawer({
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+      <div className="p-4 border-t border-[#222222] flex items-center justify-between text-xs text-[#888888] font-mono">
         <div className="flex items-center gap-1.5">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span>DynamoDB DocumentClient Connected</span>
         </div>
-        <span>Auto-synced</span>
+        <span className="text-[#555555]">Auto-synced</span>
       </div>
     </div>
   );

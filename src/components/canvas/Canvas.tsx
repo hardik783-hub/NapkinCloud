@@ -419,7 +419,7 @@ const handleJumpToLive = useCallback(() => {
 
   return (
     
-    <div ref={reactFlowWrapper} className="w-screen h-screen bg-slate-950 text-slate-100 relative overflow-hidden">
+    <div ref={reactFlowWrapper} className="w-screen h-screen bg-[#080808] text-neutral-100 relative overflow-hidden">
       <TopBar
         nodes={nodes}
         edges={edges}
@@ -450,13 +450,13 @@ const handleJumpToLive = useCallback(() => {
         nodeTypes={nodeTypes}
         fitView
         colorMode="dark"
-        className="bg-slate-950"
+        className="bg-[#080808]"
       >
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
-          size={1.5}
-          color="#334155"
+          size={1.25}
+          color="#222222"
         />
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>

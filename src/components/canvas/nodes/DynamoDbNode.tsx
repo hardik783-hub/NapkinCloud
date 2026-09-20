@@ -25,9 +25,9 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
 
   const statusConfig = {
     draft: {
-      border: 'border-slate-800 hover:border-slate-700',
-      dot: 'bg-slate-500',
-      badge: 'bg-slate-900/80 text-slate-400 border-slate-800',
+      border: 'border-[#222222] hover:border-[#383838]',
+      dot: 'bg-[#555555]',
+      badge: 'bg-[#141414] text-[#888888] border-[#222222]',
       label: 'Draft',
     },
     compiling: {
@@ -58,7 +58,7 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
 
   return (
     <div
-      className={`relative w-64 rounded-xl bg-slate-950/95 backdrop-blur-md p-3.5 border transition-all duration-200 text-slate-100 ${
+      className={`relative w-64 rounded-xl bg-[#0E0E0E]/95 backdrop-blur-md p-3.5 border transition-all duration-200 text-[#EDEDED] ${
         statusConfig.border
       } ${
         selected
@@ -70,14 +70,14 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3.5 h-3.5 bg-indigo-400 border-2 border-slate-950 rounded-full hover:scale-125 transition-transform hover:shadow-[0_0_10px_rgba(99,102,241,0.6)]"
+        className="w-3.5 h-3.5 bg-indigo-400 border-2 border-[#0E0E0E] rounded-full hover:scale-125 transition-transform hover:shadow-[0_0_10px_rgba(99,102,241,0.6)]"
       />
 
       {/* Top Hairline Highlight */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-t-xl" />
 
       {/* Header */}
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+      <div className="flex items-center justify-between pb-2.5 border-b border-[#222222]">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
             <Database className="w-4 h-4" />
@@ -86,7 +86,7 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
             <span className="text-[10px] font-mono tracking-wider text-indigo-400 uppercase font-semibold">
               AWS DYNAMODB
             </span>
-            <p className="text-xs font-medium text-slate-200">NoSQL Datastore</p>
+            <p className="text-xs font-medium text-[#EDEDED]">NoSQL Datastore</p>
           </div>
         </div>
 
@@ -100,9 +100,9 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
       {/* Form Fields */}
       <div className="mt-3 space-y-2">
         <div>
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
             <span>PHYSICAL TABLE</span>
-            <span className="text-slate-500">PAY_PER_REQUEST</span>
+            <span className="text-[#555555]">PAY_PER_REQUEST</span>
           </div>
           <input
             type="text"
@@ -110,12 +110,12 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
             onChange={(e) => updateField('tableName', e.target.value)}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder="OrdersTable"
-            className="w-full bg-black/50 border border-slate-800/90 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-400/50 transition"
+            className="w-full bg-[#050505] border border-[#202020] rounded-lg px-2.5 py-1 text-xs font-mono text-[#EDEDED] placeholder-[#555555] focus:outline-none focus:border-indigo-400/50 transition"
           />
         </div>
 
         <div>
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
             <span>PARTITION KEY</span>
             <span className="text-indigo-400/80">HASH (String)</span>
           </div>
@@ -125,7 +125,7 @@ function DynamoDbNodeComponent({ id, data, selected }: NodeProps<DynamoDbNode>) 
             onChange={(e) => updateField('primaryKey', e.target.value)}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder="orderId"
-            className="w-full bg-black/50 border border-slate-800/90 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-400/50 transition"
+            className="w-full bg-[#050505] border border-[#202020] rounded-lg px-2.5 py-1 text-xs font-mono text-[#EDEDED] placeholder-[#555555] focus:outline-none focus:border-indigo-400/50 transition"
           />
         </div>
 

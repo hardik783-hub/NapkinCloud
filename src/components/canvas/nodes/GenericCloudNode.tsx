@@ -210,9 +210,9 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
 
   const statusConfig = {
     draft: {
-      border: 'border-slate-800 hover:border-slate-700',
-      dot: 'bg-slate-500',
-      badge: 'bg-slate-900/80 text-slate-400 border-slate-800',
+      border: 'border-[#222222] hover:border-[#383838]',
+      dot: 'bg-[#555555]',
+      badge: 'bg-[#141414] text-[#888888] border-[#222222]',
       label: 'Static',
     },
     compiling: {
@@ -243,7 +243,7 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
 
   return (
     <div
-      className={`relative w-64 rounded-xl bg-slate-950/95 backdrop-blur-md p-3.5 border transition-all duration-200 text-slate-100 ${
+      className={`relative w-64 rounded-xl bg-[#0E0E0E]/95 backdrop-blur-md p-3.5 border transition-all duration-200 text-[#EDEDED] ${
         statusConfig.border
       } ${
         selected
@@ -255,7 +255,7 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3.5 h-3.5 border-2 border-slate-950 rounded-full hover:scale-125 transition-transform"
+        className="w-3.5 h-3.5 border-2 border-[#0E0E0E] rounded-full hover:scale-125 transition-transform"
         style={{ backgroundColor: def.handleColor }}
       />
 
@@ -263,7 +263,7 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
       <Handle
         type="source"
         position={Position.Right}
-        className="w-3.5 h-3.5 border-2 border-slate-950 rounded-full hover:scale-125 transition-transform"
+        className="w-3.5 h-3.5 border-2 border-[#0E0E0E] rounded-full hover:scale-125 transition-transform"
         style={{ backgroundColor: def.handleColor }}
       />
 
@@ -271,16 +271,16 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
       <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${def.hairlineClass} to-transparent rounded-t-xl`} />
 
       {/* Header */}
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+      <div className="flex items-center justify-between pb-2.5 border-b border-[#222222]">
         <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded-lg bg-slate-900 ${def.colorClass} border border-slate-800 flex items-center justify-center`}>
+          <div className={`p-1.5 rounded-lg bg-[#141414] ${def.colorClass} border border-[#222222] flex items-center justify-center`}>
             <IconComponent className="w-4 h-4" />
           </div>
           <div>
             <span className={`text-[10px] font-mono tracking-wider ${def.colorClass} uppercase font-semibold`}>
               {def.label}
             </span>
-            <p className="text-xs font-medium text-slate-200">{def.subLabel}</p>
+            <p className="text-xs font-medium text-[#EDEDED]">{def.subLabel}</p>
           </div>
         </div>
 
@@ -294,9 +294,9 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
       {/* Form Fields */}
       <div className="mt-3 space-y-2">
         <div>
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
             <span>{def.fieldLabel}</span>
-            <span className="text-slate-500 font-sans text-[9px]">Resource ID</span>
+            <span className="text-[#555555] font-sans text-[9px]">Resource ID</span>
           </div>
           <input
             type="text"
@@ -304,12 +304,12 @@ function GenericCloudNodeComponent({ id, data, type, selected }: NodeProps<Gener
             onChange={(e) => updateField('resourceName', e.target.value)}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder={def.defaultVal}
-            className="w-full bg-black/50 border border-slate-800/90 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-600 transition"
+            className="w-full bg-[#050505] border border-[#202020] rounded-lg px-2.5 py-1 text-xs font-mono text-[#EDEDED] placeholder-[#555555] focus:outline-none focus:border-[#383838] transition"
           />
         </div>
 
-        <div className="p-2 rounded-lg bg-slate-900/40 border border-slate-800/70 flex items-center justify-between text-[10px] font-mono">
-          <span className="text-slate-400 uppercase">{def.propKey}</span>
+        <div className="p-2 rounded-lg bg-[#121212] border border-[#202020] flex items-center justify-between text-[10px] font-mono">
+          <span className="text-[#888888] uppercase">{def.propKey}</span>
           <span className={`${def.colorClass} font-semibold truncate max-w-[130px]`}>
             {def.propVal}
           </span>

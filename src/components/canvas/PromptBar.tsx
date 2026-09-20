@@ -92,11 +92,11 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
       <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
         <button
           onClick={() => setIsCollapsed(false)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs text-slate-300 hover:text-white shadow-xl backdrop-blur-md transition select-none"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#111111]/90 hover:bg-[#1A1A1A] border border-[#262626] text-xs text-[#A3A3A3] hover:text-[#EDEDED] shadow-xl backdrop-blur-md transition select-none"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
           <span>Prompt Bar (Natural Language ➔ Canvas)</span>
-          <span className="text-[10px] text-slate-500 font-mono">Expand ▾</span>
+          <span className="text-[10px] text-[#666666] font-mono">Expand ▾</span>
         </button>
       </div>
     );
@@ -104,22 +104,22 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
 
   return (
     <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4 pointer-events-auto select-none">
-      <div className="bg-slate-950/90 backdrop-blur-xl border border-slate-800 rounded-xl shadow-2xl p-3 transition-all focus-within:border-cyan-500/50">
+      <div className="bg-[#0E0E0E]/95 backdrop-blur-xl border border-[#222222] rounded-xl shadow-2xl p-3 transition-all focus-within:border-[#383838]">
         {/* Header matching Hardik's sketch */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-bold text-slate-200 uppercase tracking-wide">
+            <span className="text-xs font-bold text-[#EDEDED] uppercase tracking-wide">
               Describe what you want to build
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-cyan-400 border border-slate-800">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161616] text-[#A3A3A3] border border-[#262626]">
               Natural Language ➔ Architecture
             </span>
             <button
               onClick={() => setIsCollapsed(true)}
-              className="text-[10px] text-slate-500 hover:text-slate-300 font-mono px-1 py-0.5 rounded hover:bg-slate-900 transition"
+              className="text-[10px] text-[#666666] hover:text-[#D4D4D4] font-mono px-1 py-0.5 rounded hover:bg-[#161616] transition"
               title="Collapse Prompt Bar"
             >
               Hide ▴
@@ -140,17 +140,17 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
             onChange={(e) => setPrompt(e.target.value)}
             disabled={disabled || isGenerating}
             placeholder="I want an API where users can create and retrieve their previous orders."
-            className="flex-1 bg-slate-950/80 border border-slate-800/80 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50 transition"
+            className="flex-1 bg-[#050505] border border-[#202020] rounded-xl px-3.5 py-2 text-sm text-[#EDEDED] placeholder-[#555555] focus:outline-none focus:border-[#444444] disabled:opacity-50 transition"
           />
 
           <button
             type="submit"
             disabled={!prompt.trim() || disabled || isGenerating}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 uppercase tracking-wide"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-[#0A0A0A] bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-500/15 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 uppercase tracking-wide"
           >
             {isGenerating ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0A0A0A]" />
                 <span>Thinking...</span>
               </>
             ) : (
@@ -162,8 +162,8 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
         </form>
 
         {/* Preset Prompt Quick Chips */}
-        <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-800/60 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase shrink-0 pl-1">
+        <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-[#222222] overflow-x-auto no-scrollbar">
+          <span className="text-[10px] font-semibold tracking-wider text-[#666666] uppercase shrink-0 pl-1">
             Quick Prompts:
           </span>
           {PRESET_PROMPTS.map((item) => (
@@ -172,7 +172,7 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
               type="button"
               onClick={() => handleChipClick(item)}
               disabled={disabled || isGenerating}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700/60 hover:border-amber-400/40 text-[11px] text-slate-300 hover:text-white transition-all shrink-0"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#141414] hover:bg-[#1C1C1C] border border-[#222222] hover:border-[#333333] text-[11px] text-[#A3A3A3] hover:text-[#EDEDED] transition-all shrink-0"
             >
               <span>{item.emoji}</span>
               <span>{item.label}</span>

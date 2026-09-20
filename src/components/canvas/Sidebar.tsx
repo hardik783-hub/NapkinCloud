@@ -161,10 +161,10 @@ export default function Sidebar() {
 
   if (collapsed) {
     return (
-      <aside className="fixed left-0 top-14 bottom-0 w-12 bg-slate-950/95 backdrop-blur-md border-r border-slate-800/80 py-4 px-2 z-20 flex flex-col items-center justify-between pointer-events-auto select-none">
+      <aside className="fixed left-0 top-14 bottom-0 w-12 bg-[#0A0A0A]/95 backdrop-blur-md border-r border-[#222222] py-4 px-2 z-20 flex flex-col items-center justify-between pointer-events-auto select-none">
         <button
           onClick={() => setCollapsed(false)}
-          className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition active:scale-95"
+          className="p-2 rounded-lg bg-[#141414] hover:bg-[#1E1E1E] text-[#888888] hover:text-[#EDEDED] border border-[#222222] transition active:scale-95"
           title="Expand Component Palette"
         >
           <Layers className="w-4 h-4 text-cyan-400" />
@@ -174,25 +174,25 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-14 bottom-0 w-60 bg-slate-950/95 backdrop-blur-md border-r border-slate-800/80 p-3.5 z-20 flex flex-col justify-between pointer-events-auto select-none">
+    <aside className="fixed left-0 top-14 bottom-0 w-60 bg-[#0A0A0A]/95 backdrop-blur-md border-r border-[#222222] p-3.5 z-20 flex flex-col justify-between pointer-events-auto select-none">
       <div className="flex flex-col gap-2.5 flex-1 min-h-0">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 shrink-0">
+        <div className="flex items-center justify-between pb-2 border-b border-[#222222] shrink-0">
           <div className="flex items-center gap-2">
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#A3A3A3]">
               Cloud Palette
             </span>
           </div>
           <button
             onClick={() => setCollapsed(true)}
-            className="text-[10px] text-slate-500 hover:text-slate-300 px-1.5 py-0.5 rounded hover:bg-slate-900 transition font-mono"
+            className="text-[10px] text-[#666666] hover:text-[#D4D4D4] px-1.5 py-0.5 rounded hover:bg-[#141414] transition font-mono"
             title="Collapse Sidebar"
           >
             Collapse ‹
           </button>
         </div>
 
-        <p className="text-[11px] text-slate-400 leading-snug shrink-0">
+        <p className="text-[11px] text-[#888888] leading-snug shrink-0">
           Drag blocks to construct your serverless pipeline.
         </p>
 
@@ -203,23 +203,23 @@ export default function Sidebar() {
               key={item.type}
               draggable={item.enabled}
               onDragStart={(e) => item.enabled && onDragStart(e, item.type)}
-              className="flex items-center gap-2.5 p-2 rounded-lg border transition-all duration-150 cursor-grab active:cursor-grabbing bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900 active:scale-[0.98]"
+              className="flex items-center gap-2.5 p-2 rounded-lg border transition-all duration-150 cursor-grab active:cursor-grabbing bg-[#121212]/90 border-[#222222] hover:border-[#383838] hover:bg-[#181818] active:scale-[0.98]"
             >
               <div className={`p-1.5 rounded-md ${item.bgColor} ${item.iconColor} shrink-0`}>
                 {item.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-xs font-medium text-slate-200 truncate block">
+                <span className="text-xs font-medium text-[#EDEDED] truncate block">
                   {item.label}
                 </span>
-                <p className="text-[10px] text-slate-400 truncate">{item.subLabel}</p>
+                <p className="text-[10px] text-[#888888] truncate">{item.subLabel}</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="pt-2.5 mt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-500 shrink-0">
+      <div className="pt-2.5 mt-2 border-t border-[#222222] flex items-center justify-between text-[10px] font-mono text-[#666666] shrink-0">
         <span>12 Cloud Blocks</span>
         <span className="text-emerald-400 font-medium">All Available</span>
       </div>

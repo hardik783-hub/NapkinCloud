@@ -25,9 +25,9 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
 
   const statusConfig = {
     draft: {
-      border: 'border-slate-800 hover:border-slate-700',
-      dot: 'bg-slate-500',
-      badge: 'bg-slate-900/80 text-slate-400 border-slate-800',
+      border: 'border-[#222222] hover:border-[#383838]',
+      dot: 'bg-[#555555]',
+      badge: 'bg-[#141414] text-[#888888] border-[#222222]',
       label: 'Draft',
     },
     compiling: {
@@ -58,7 +58,7 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
 
   return (
     <div
-      className={`relative w-64 rounded-xl bg-slate-950/95 backdrop-blur-md p-3.5 border transition-all duration-200 text-slate-100 ${
+      className={`relative w-64 rounded-xl bg-[#0E0E0E]/95 backdrop-blur-md p-3.5 border transition-all duration-200 text-[#EDEDED] ${
         statusConfig.border
       } ${
         selected
@@ -70,7 +70,7 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-t-xl" />
 
       {/* Header */}
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+      <div className="flex items-center justify-between pb-2.5 border-b border-[#222222]">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
             <Globe className="w-4 h-4" />
@@ -79,7 +79,7 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
             <span className="text-[10px] font-mono tracking-wider text-cyan-400 uppercase font-semibold">
               API GATEWAY
             </span>
-            <p className="text-xs font-medium text-slate-200">HTTP REST Trigger</p>
+            <p className="text-xs font-medium text-[#EDEDED]">HTTP REST Trigger</p>
           </div>
         </div>
 
@@ -92,17 +92,17 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
 
       {/* Route Configuration Input Group */}
       <div className="mt-3 space-y-2">
-        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <div className="flex items-center justify-between text-[10px] font-mono text-[#888888]">
           <span>ENDPOINT ROUTE</span>
-          <span className="text-slate-500">HTTPS</span>
+          <span className="text-[#555555]">HTTPS</span>
         </div>
 
-        <div className="flex gap-1.5 bg-black/50 border border-slate-800/90 rounded-lg p-1 focus-within:border-cyan-500/50 transition">
+        <div className="flex gap-1.5 bg-[#050505] border border-[#202020] rounded-lg p-1 focus-within:border-cyan-500/50 transition">
           <select
             value={data.method}
             onChange={(e) => updateField('method', e.target.value as HttpMethod)}
             onMouseDown={(e) => e.stopPropagation()}
-            className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs font-mono font-bold text-cyan-400 focus:outline-none cursor-pointer"
+            className="bg-[#121212] border border-[#242424] rounded px-2 py-1 text-xs font-mono font-bold text-cyan-400 focus:outline-none cursor-pointer"
           >
             <option value="POST">POST</option>
             <option value="GET">GET</option>
@@ -116,7 +116,7 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
             onChange={(e) => updateField('path', e.target.value)}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder="/orders"
-            className="flex-1 bg-transparent px-2 py-1 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none"
+            className="flex-1 bg-transparent px-2 py-1 text-xs font-mono text-[#EDEDED] placeholder-[#555555] focus:outline-none"
           />
         </div>
 
@@ -132,7 +132,7 @@ function ApiGatewayNodeComponent({ id, data, selected }: NodeProps<ApiGatewayNod
       <Handle
         type="source"
         position={Position.Right}
-        className="w-3.5 h-3.5 bg-cyan-400 border-2 border-slate-950 rounded-full hover:scale-125 transition-transform hover:shadow-[0_0_10px_rgba(6,182,212,0.6)]"
+        className="w-3.5 h-3.5 bg-cyan-400 border-2 border-[#0E0E0E] rounded-full hover:scale-125 transition-transform hover:shadow-[0_0_10px_rgba(6,182,212,0.6)]"
       />
     </div>
   );
