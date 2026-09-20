@@ -45,8 +45,71 @@ function buildCanvasElements(
   businessLogic: string,
   tableName: string,
   primaryKey: string,
-  serviceType: 'dynamodb' | 's3' = 'dynamodb'
+  serviceType: string = 'dynamodb'
 ): { nodes: AppNode[]; edges: AppEdge[] } {
+  let downstreamNode: AppNode;
+  let targetNodeId = 'node-dynamodb-1';
+  let edgeColor = '#f59e0b';
+
+  if (serviceType === 's3') {
+    targetNodeId = 'node-s3-1';
+    edgeColor = '#10b981';
+    downstreamNode = {
+      id: targetNodeId,
+      type: 's3',
+      position: { x: 1060, y: 220 },
+      data: {
+        label: 'AWS S3 Bucket',
+        serviceType: 's3',
+        subLabel: 'Object Storage Bucket',
+        resourceName: tableName || 'uploads-bucket',
+        status: 'draft',
+      },
+    };
+  } else if (serviceType === 'sqs') {
+    targetNodeId = 'node-sqs-1';
+    edgeColor = '#ec4899';
+    downstreamNode = {
+      id: targetNodeId,
+      type: 'sqs',
+      position: { x: 1060, y: 220 },
+      data: {
+        label: 'AWS SQS Queue',
+        serviceType: 'sqs',
+        subLabel: 'Message Queue',
+        resourceName: tableName || 'app-queue',
+        status: 'draft',
+      },
+    };
+  } else if (serviceType === 'sns') {
+    targetNodeId = 'node-sns-1';
+    edgeColor = '#f43f5e';
+    downstreamNode = {
+      id: targetNodeId,
+      type: 'sns',
+      position: { x: 1060, y: 220 },
+      data: {
+        label: 'AWS SNS Topic',
+        serviceType: 'sns',
+        subLabel: 'Pub/Sub Topic',
+        resourceName: tableName || 'app-topic',
+        status: 'draft',
+      },
+    };
+  } else {
+    downstreamNode = {
+      id: targetNodeId,
+      type: 'dynamodb',
+      position: { x: 1060, y: 220 },
+      data: {
+        label: 'DynamoDB',
+        tableName: tableName || 'DataTable',
+        primaryKey: primaryKey || 'id',
+        status: 'draft',
+      },
+    };
+  }
+
   const nodes: AppNode[] = [
     {
       id: 'node-api-1',
@@ -71,30 +134,7 @@ function buildCanvasElements(
         status: 'draft',
       },
     },
-    serviceType === 's3'
-      ? {
-          id: 'node-s3-1',
-          type: 's3',
-          position: { x: 1060, y: 220 },
-          data: {
-            label: 'AWS S3 Bucket',
-            serviceType: 's3',
-            subLabel: 'Object Storage Bucket',
-            resourceName: tableName || 'uploads-bucket',
-            status: 'draft',
-          },
-        }
-      : {
-          id: 'node-dynamodb-1',
-          type: 'dynamodb',
-          position: { x: 1060, y: 220 },
-          data: {
-            label: 'DynamoDB',
-            tableName,
-            primaryKey,
-            status: 'draft',
-          },
-        },
+    downstreamNode,
   ];
 
   const edges: AppEdge[] = [
@@ -109,10 +149,10 @@ function buildCanvasElements(
     {
       id: 'edge-2',
       source: 'node-lambda-1',
-      target: serviceType === 's3' ? 'node-s3-1' : 'node-dynamodb-1',
+      target: targetNodeId,
       animated: true,
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
-      style: { stroke: '#f59e0b', strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
+      style: { stroke: edgeColor, strokeWidth: 2 },
     },
   ];
 
@@ -277,6 +317,45 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
   };
 }
 
+function resolveServiceType(parsed: any, prompt: string): string {
+  const p = prompt.toLowerCase();
+  const reasoningServices = Array.isArray(parsed?.reasoning)
+    ? parsed.reasoning.map((r: any) => String(r.service || '').toLowerCase())
+    : [];
+
+  const isS3 =
+    parsed?.serviceType === 's3' ||
+    reasoningServices.some((s: string) => s.includes('s3')) ||
+    p.includes('s3') ||
+    p.includes('upload') ||
+    p.includes('photo') ||
+    p.includes('image') ||
+    p.includes('bucket') ||
+    p.includes('file') ||
+    p.includes('media');
+
+  if (isS3) return 's3';
+
+  const isSQS =
+    parsed?.serviceType === 'sqs' ||
+    reasoningServices.some((s: string) => s.includes('sqs')) ||
+    p.includes('sqs') ||
+    p.includes('queue');
+
+  if (isSQS) return 'sqs';
+
+  const isSNS =
+    parsed?.serviceType === 'sns' ||
+    reasoningServices.some((s: string) => s.includes('sns')) ||
+    p.includes('sns') ||
+    p.includes('topic') ||
+    p.includes('broadcast');
+
+  if (isSNS) return 'sns';
+
+  return 'dynamodb';
+}
+
 export async function generateArchitectureFromPrompt(
   prompt: string
 ): Promise<GeneratedArchitectureResponse> {
@@ -360,6 +439,7 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
       const businessLogic = parsed.lambda?.businessLogic || 'Processes payload and writes to DynamoDB';
       const tableName = (parsed.dynamodb?.tableName || 'DataTable').replace(/[^a-zA-Z0-9]/g, '');
       const primaryKey = (parsed.dynamodb?.primaryKey || 'id').replace(/[^a-zA-Z0-9]/g, '');
+      const serviceType = resolveServiceType(parsed, prompt);
 
       const { nodes, edges } = buildCanvasElements(
         method,
@@ -367,16 +447,23 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
         functionName,
         businessLogic,
         tableName,
-        primaryKey
+        primaryKey,
+        serviceType
       );
+
+      const defaultReason = serviceType === 's3'
+        ? { service: 's3', reason: 'High-durability object storage for storing photos, documents, and media assets.' }
+        : { service: 'dynamodb', reason: 'Managed NoSQL table ensuring fast, predictable write and read latency.' };
 
       const reasoning: ServiceReasoning[] = Array.isArray(parsed.reasoning) && parsed.reasoning.length === 3
         ? parsed.reasoning
         : [
             { service: 'api_gateway', reason: 'Provides secure HTTPS entry point with managed routing and throttling.' },
             { service: 'lambda', reason: 'Runs NodeJS serverless logic on-demand with automatic scaling.' },
-            { service: 'dynamodb', reason: 'Managed NoSQL table ensuring fast, predictable write and read latency.' },
+            defaultReason,
           ];
+
+      const downstreamId = serviceType === 's3' ? 's3_1' : (serviceType === 'sqs' ? 'sqs_1' : (serviceType === 'sns' ? 'sns_1' : 'db1'));
 
       return {
         success: true,
@@ -390,11 +477,21 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
           nodes: [
             { id: 'api1', type: 'api_gateway', purpose: `HTTP ${method} endpoint at ${path}` },
             { id: 'lambda1', type: 'lambda', purpose: businessLogic },
-            { id: 'db1', type: 'dynamodb', purpose: `NoSQL storage partitioned by ${primaryKey}` },
+            {
+              id: downstreamId,
+              type: serviceType,
+              purpose: serviceType === 's3'
+                ? `Object storage bucket for ${parsed.application?.name || 'assets'}`
+                : serviceType === 'sqs'
+                ? 'Managed message queue for async processing'
+                : serviceType === 'sns'
+                ? 'Managed topic for event fanout'
+                : `NoSQL storage partitioned by ${primaryKey}`,
+            },
           ],
           connections: [
             { from: 'api1', to: 'lambda1' },
-            { from: 'lambda1', to: 'db1' },
+            { from: 'lambda1', to: downstreamId },
           ],
         },
         reasoning,
@@ -468,22 +565,31 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
       const tableName = (parsed.dynamodb?.tableName || 'DataTable').replace(/[^a-zA-Z0-9]/g, '');
       const primaryKey = (parsed.dynamodb?.primaryKey || 'id').replace(/[^a-zA-Z0-9]/g, '');
 
+      const serviceType = resolveServiceType(parsed, prompt);
+
       const { nodes, edges } = buildCanvasElements(
         method,
         path,
         functionName,
         businessLogic,
         tableName,
-        primaryKey
+        primaryKey,
+        serviceType
       );
+
+      const defaultReason = serviceType === 's3'
+        ? { service: 's3', reason: 'High-durability object storage for storing photos, documents, and media assets.' }
+        : { service: 'dynamodb', reason: 'Managed NoSQL table ensuring fast, predictable write and read latency.' };
 
       const reasoning: ServiceReasoning[] = Array.isArray(parsed.reasoning) && parsed.reasoning.length === 3
         ? parsed.reasoning
         : [
             { service: 'api_gateway', reason: 'Provides secure HTTPS entry point with managed routing and throttling.' },
             { service: 'lambda', reason: 'Runs NodeJS serverless logic on-demand with automatic scaling.' },
-            { service: 'dynamodb', reason: 'Managed NoSQL table ensuring fast, predictable write and read latency.' },
+            defaultReason,
           ];
+
+      const downstreamId = serviceType === 's3' ? 's3_1' : (serviceType === 'sqs' ? 'sqs_1' : (serviceType === 'sns' ? 'sns_1' : 'db1'));
 
       return {
         success: true,
@@ -497,11 +603,21 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
           nodes: [
             { id: 'api1', type: 'api_gateway', purpose: `HTTP ${method} endpoint at ${path}` },
             { id: 'lambda1', type: 'lambda', purpose: businessLogic },
-            { id: 'db1', type: 'dynamodb', purpose: `NoSQL storage partitioned by ${primaryKey}` },
+            {
+              id: downstreamId,
+              type: serviceType,
+              purpose: serviceType === 's3'
+                ? `Object storage bucket for ${parsed.application?.name || 'assets'}`
+                : serviceType === 'sqs'
+                ? 'Managed message queue for async processing'
+                : serviceType === 'sns'
+                ? 'Managed topic for event fanout'
+                : `NoSQL storage partitioned by ${primaryKey}`,
+            },
           ],
           connections: [
             { from: 'api1', to: 'lambda1' },
-            { from: 'lambda1', to: 'db1' },
+            { from: 'lambda1', to: downstreamId },
           ],
         },
         reasoning,
