@@ -103,14 +103,17 @@ cd napkincloud
 npm install
 ```
 
-### 3. Environment Configuration (Optional)
-If Amazon Bedrock credentials are provided, NapkinCloud invokes live Claude 3.5 Sonnet for natural language extraction. If omitted, the **built-in deterministic rule fallback** guarantees 100% functionality offline:
+### 3. Environment Configuration
+Configure your Amazon Bedrock environment in `.env.local`:
 ```bash
 cp .env.example .env.local
-# Add your AWS credentials (optional for offline testing):
+```
+Set your environment variables:
+```bash
+CLAUDE_CODE_USE_BEDROCK=1
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
+AWS_BEARER_TOKEN_BEDROCK=your_bedrock_bearer_token
+NAPKIN_BACKEND_URL=http://localhost:3001
 ```
 
 ### 4. Run the Development Server
