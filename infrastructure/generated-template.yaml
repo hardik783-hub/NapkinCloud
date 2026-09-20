@@ -14,16 +14,6 @@ Resources:
         AllowMethods: '''*'''
         AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
         AllowOrigin: '''*'''
-  OrdersTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: orderId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: orderId
-          KeyType: HASH
   CreateOrderFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -49,16 +39,26 @@ Resources:
               Ref: OrdersApi
             Path: /orders
             Method: post
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: orderId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: orderId
+          KeyType: HASH
 Outputs:
   ApiUrl:
     Description: Deployed API endpoint
     Value:
       Fn::Sub: https://${OrdersApi}.execute-api.${AWS::Region}.amazonaws.com/prod/orders
-  OrdersTableName:
-    Description: Deployed DynamoDB table
-    Value:
-      Ref: OrdersTable
   LambdaFunctionName:
     Description: Deployed Lambda function
     Value:
       Ref: CreateOrderFunction
+  OrdersTableName:
+    Description: Deployed DynamoDB table
+    Value:
+      Ref: OrdersTable

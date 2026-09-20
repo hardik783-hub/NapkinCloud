@@ -44,7 +44,8 @@ function buildCanvasElements(
   functionName: string,
   businessLogic: string,
   tableName: string,
-  primaryKey: string
+  primaryKey: string,
+  serviceType: 'dynamodb' | 's3' = 'dynamodb'
 ): { nodes: AppNode[]; edges: AppEdge[] } {
   const nodes: AppNode[] = [
     {
@@ -70,17 +71,30 @@ function buildCanvasElements(
         status: 'draft',
       },
     },
-    {
-      id: 'node-dynamodb-1',
-      type: 'dynamodb',
-      position: { x: 1060, y: 220 },
-      data: {
-        label: 'DynamoDB',
-        tableName,
-        primaryKey,
-        status: 'draft',
-      },
-    },
+    serviceType === 's3'
+      ? {
+          id: 'node-s3-1',
+          type: 's3',
+          position: { x: 1060, y: 220 },
+          data: {
+            label: 'AWS S3 Bucket',
+            serviceType: 's3',
+            subLabel: 'Object Storage Bucket',
+            resourceName: tableName || 'uploads-bucket',
+            status: 'draft',
+          },
+        }
+      : {
+          id: 'node-dynamodb-1',
+          type: 'dynamodb',
+          position: { x: 1060, y: 220 },
+          data: {
+            label: 'DynamoDB',
+            tableName,
+            primaryKey,
+            status: 'draft',
+          },
+        },
   ];
 
   const edges: AppEdge[] = [
@@ -95,7 +109,7 @@ function buildCanvasElements(
     {
       id: 'edge-2',
       source: 'node-lambda-1',
-      target: 'node-dynamodb-1',
+      target: serviceType === 's3' ? 'node-s3-1' : 'node-dynamodb-1',
       animated: true,
       markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
       style: { stroke: '#f59e0b', strokeWidth: 2 },
@@ -118,7 +132,19 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
   let primaryKey = 'orderId';
   let serviceNameDesc = 'order records';
 
-  if (p.includes('user') || p.includes('auth') || p.includes('profile')) {
+  let serviceType: 'dynamodb' | 's3' = 'dynamodb';
+
+  if (p.includes('s3') || p.includes('file') || p.includes('upload') || p.includes('image') || p.includes('photo') || p.includes('document') || p.includes('media') || p.includes('asset') || p.includes('bucket')) {
+    appName = 'Cloud File & Asset Storage Service';
+    appDesc = 'Serverless upload API to process and store media assets directly in AWS S3';
+    path = '/upload';
+    functionName = 'UploadFileFunction';
+    businessLogic = 'Validates file metadata, generates S3 object key, and records asset details';
+    tableName = 'AssetsTable';
+    primaryKey = 'assetId';
+    serviceNameDesc = 'file assets';
+    serviceType = 's3';
+  } else if (p.includes('user') || p.includes('auth') || p.includes('profile')) {
     appName = 'User Profile Service';
     appDesc = 'Serverless microservice to register and look up user accounts';
     path = '/users';
@@ -211,8 +237,8 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
       reason: `Executes serverless NodeJS compute for ${appName}. Runs on-demand and auto-scales from zero to peak.`,
     },
     {
-      service: 'dynamodb',
-      reason: `Managed NoSQL database partitioned by ${primaryKey} for single-digit millisecond latency storage of ${serviceNameDesc}.`,
+      service: serviceType,
+      reason: serviceType === 's3' ? `Managed object storage for storing ${serviceNameDesc}.` : `Managed NoSQL database partitioned by ${primaryKey} for single-digit millisecond latency storage of ${serviceNameDesc}.`,
     },
   ];
 
@@ -222,7 +248,8 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
     functionName,
     businessLogic,
     tableName,
-    primaryKey
+    primaryKey,
+    serviceType
   );
 
   return {
@@ -268,7 +295,7 @@ export async function generateArchitectureFromPrompt(
 The user wants to build a backend system described by this natural language prompt:
 "${prompt}"
 
-Produce a standard AWS 3-tier Serverless microservice pattern (API Gateway -> Lambda -> DynamoDB).
+Produce a standard AWS Serverless microservice pattern. If the prompt is about files, uploads, images, or documents, choose S3 storage. If it is about data, records, or entities, choose DynamoDB. If both, include both.
 Return ONLY a valid JSON object matching this schema:
 {
   "application": {
@@ -387,7 +414,7 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
 The user wants to build a backend system described by this natural language prompt:
 "${prompt}"
 
-Produce a standard AWS 3-tier Serverless microservice pattern (API Gateway -> Lambda -> DynamoDB).
+Produce a standard AWS Serverless microservice pattern. If the prompt is about files, uploads, images, or documents, choose S3 storage. If it is about data, records, or entities, choose DynamoDB. If both, include both.
 Return ONLY a valid JSON object matching this schema:
 {
   "application": {

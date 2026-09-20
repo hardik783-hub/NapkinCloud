@@ -53,7 +53,7 @@ function compileArchitecture(graph) {
   // STEP 4 — Generate Lambda
   console.log("⚙️ Generating Lambda code...");
 
-  const lambdaCode = generateLambdaCode(lambdaNode, databaseNode);
+  const lambdaCode = generateLambdaCode(lambdaNode, databaseNode, graph.nodes);
 
   const lambdaDir = path.join(infrastructureDir, "functions", "generated");
 

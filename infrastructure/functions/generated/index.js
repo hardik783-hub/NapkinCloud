@@ -108,6 +108,14 @@ exports.handler = async (event) => {
       })
     );
 
+    
+
+    
+
+    
+
+    
+
     return {
       statusCode: 201,
       headers: corsHeaders,

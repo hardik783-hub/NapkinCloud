@@ -1,4 +1,4 @@
-function generateLambdaCode(lambdaNode, databaseNode) {
+function generateLambdaCode(lambdaNode, databaseNode, allNodes = []) {
   const functionName = lambdaNode.data?.functionName || lambdaNode.config?.functionName || "NapkinCloudFunction";
 
   const logic = lambdaNode.data?.businessLogic || lambdaNode.config?.logic || "Process the incoming request";
@@ -6,6 +6,12 @@ function generateLambdaCode(lambdaNode, databaseNode) {
   const tableName = databaseNode?.data?.tableName || databaseNode?.config?.tableName || "NapkinCloudTable";
 
   const partitionKey = databaseNode?.data?.primaryKey || databaseNode?.config?.partitionKey || "id";
+
+  const hasS3 = allNodes.some((n) => n.type === "s3");
+  const hasSQS = allNodes.some((n) => n.type === "sqs");
+  const hasSNS = allNodes.some((n) => n.type === "sns");
+  const hasEventBridge = allNodes.some((n) => n.type === "eventbridge");
+  const hasDynamoDB = allNodes.some((n) => n.type === "dynamodb");
 
   return `const {
   DynamoDBClient
@@ -22,7 +28,7 @@ const {
   randomUUID
 } = require("crypto");
 
-const client = new DynamoDBClient({});
+${hasS3 ? 'const { S3Client, PutObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");\\nconst s3 = new S3Client({});\\n' : ''}${hasSQS ? 'const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");\\nconst sqs = new SQSClient({});\\n' : ''}${hasSNS ? 'const { SNSClient, PublishCommand } = require("@aws-sdk/client-sns");\\nconst sns = new SNSClient({});\\n' : ''}${hasEventBridge ? 'const { EventBridgeClient, PutEventsCommand } = require("@aws-sdk/client-eventbridge");\\nconst eventbridge = new EventBridgeClient({});\\n' : ''}const client = new DynamoDBClient({});
 
 const dynamodb =
   DynamoDBDocumentClient.from(client);
@@ -110,12 +116,63 @@ exports.handler = async (event) => {
       updatedAt: now
     };
 
-    await dynamodb.send(
+    ${hasDynamoDB ? `await dynamodb.send(
       new PutCommand({
         TableName: process.env.TABLE_NAME,
         Item: record
       })
-    );
+    );` : ""}
+
+    ${hasS3 ? `if (process.env.BUCKET_NAME) {
+      try {
+        await s3.send(new PutObjectCommand({
+          Bucket: process.env.BUCKET_NAME,
+          Key: "uploads/" + pkValue + ".json",
+          Body: JSON.stringify(record),
+          ContentType: "application/json"
+        }));
+        record._s3Key = "uploads/" + pkValue + ".json";
+      } catch (s3Err) {
+        console.warn("[NapkinCloud] S3 write warning:", s3Err.message);
+      }
+    }` : ""}
+
+    ${hasSQS ? `if (process.env.QUEUE_URL) {
+      try {
+        await sqs.send(new SendMessageCommand({
+          QueueUrl: process.env.QUEUE_URL,
+          MessageBody: JSON.stringify(record)
+        }));
+      } catch (sqsErr) {
+        console.warn("[NapkinCloud] SQS send warning:", sqsErr.message);
+      }
+    }` : ""}
+
+    ${hasSNS ? `if (process.env.TOPIC_ARN) {
+      try {
+        await sns.send(new PublishCommand({
+          TopicArn: process.env.TOPIC_ARN,
+          Message: JSON.stringify(record)
+        }));
+      } catch (snsErr) {
+        console.warn("[NapkinCloud] SNS publish warning:", snsErr.message);
+      }
+    }` : ""}
+
+    ${hasEventBridge ? `if (process.env.EVENT_BUS_NAME) {
+      try {
+        await eventbridge.send(new PutEventsCommand({
+          Entries: [{
+            EventBusName: process.env.EVENT_BUS_NAME,
+            Source: "napkincloud.app",
+            DetailType: "RecordCreated",
+            Detail: JSON.stringify(record)
+          }]
+        }));
+      } catch (ebErr) {
+        console.warn("[NapkinCloud] EventBridge warning:", ebErr.message);
+      }
+    }` : ""}
 
     return {
       statusCode: 201,

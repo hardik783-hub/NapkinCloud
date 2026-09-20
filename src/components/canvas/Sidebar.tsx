@@ -257,15 +257,15 @@ export default function Sidebar() {
                 </span>
                 <p className="text-[10px] text-[#888888] truncate">{item.subLabel}</p>
               </div>
-              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-[#1A1A1A] text-[#555555] border border-[#262626] shrink-0 uppercase tracking-wider">Soon</span>
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 uppercase tracking-wider">Live</span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="pt-2.5 mt-2 border-t border-[#222222] flex items-center justify-between text-[10px] font-mono text-[#666666] shrink-0">
-        <span>3 Core + 9 Extended</span>
-        <span className="text-emerald-400 font-medium">Core Ready</span>
+        <span>12 Cloud Blocks</span>
+        <span className="text-emerald-400 font-medium">All Deployable</span>
       </div>
     </aside>
   );
