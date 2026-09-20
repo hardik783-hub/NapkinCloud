@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
 const archiver = require("archiver");
-const { ZipArchive } = require("archiver");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const {
@@ -28,7 +27,7 @@ function createLambdaZip(lambdaPath, zipPath) {
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(zipPath);
 
-    const archive = new ZipArchive({
+    const archive = archiver("zip", {
       zlib: { level: 9 },
     });
 
