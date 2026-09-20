@@ -71,14 +71,20 @@ async function deployStack(stackName, templatePath) {
 
   console.log("📦 Uploading Lambda ZIP to S3...");
 
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: lambdaKey,
-      Body: fs.createReadStream(zipPath),
-      ContentType: "application/zip",
-    }),
-  );
+  try {
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: lambdaKey,
+        Body: fs.createReadStream(zipPath),
+        ContentType: "application/zip",
+      }),
+    );
+  } catch (s3Error) {
+    throw new Error(
+      `S3 Upload failed to bucket '${BUCKET}': ${s3Error.message || s3Error}. (Check AWS credentials or S3 bucket permissions)`
+    );
+  }
 
   console.log("✅ Lambda ZIP uploaded");
 
@@ -121,21 +127,27 @@ async function deployStack(stackName, templatePath) {
   // 8. Deploy CloudFormation
   console.log("☁️ Creating CloudFormation stack...");
 
-  await cloudformation.send(
-    new CreateStackCommand({
-      StackName: stackName,
+  try {
+    await cloudformation.send(
+      new CreateStackCommand({
+        StackName: stackName,
 
-      TemplateBody: finalTemplate,
+        TemplateBody: finalTemplate,
 
-      Capabilities: [
-        "CAPABILITY_IAM",
-        "CAPABILITY_NAMED_IAM",
-        "CAPABILITY_AUTO_EXPAND",
-      ],
+        Capabilities: [
+          "CAPABILITY_IAM",
+          "CAPABILITY_NAMED_IAM",
+          "CAPABILITY_AUTO_EXPAND",
+        ],
 
-      OnFailure: "DO_NOTHING",
-    }),
-  );
+        OnFailure: "DO_NOTHING",
+      }),
+    );
+  } catch (cfError) {
+    throw new Error(
+      `CloudFormation stack creation failed for '${stackName}': ${cfError.message || cfError}. (Check IAM permissions)`
+    );
+  }
 
   console.log("⏳ Waiting for AWS deployment...");
 

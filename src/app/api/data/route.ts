@@ -3,7 +3,6 @@ import {
   DynamoDBClient,
   ScanCommand,
 } from '@aws-sdk/client-dynamodb';
-import { getTableRecords } from '@/lib/dataStore';
 export const dynamic = 'force-dynamic';
 
 const REGION = process.env.AWS_REGION || 'us-east-1';
@@ -59,16 +58,14 @@ export async function GET(req: Request) {
       items,
     });
   } catch (error: any) {
-    console.warn('⚠️ Real DynamoDB scan failed, falling back to local table records:', error.message);
+    console.error('❌ DynamoDB scan failed:', error);
 
-    const localRecords = getTableRecords(tableName) || getTableRecords('OrdersTable') || [];
-
-    return NextResponse.json({
-      success: true,
-      tableName,
-      count: localRecords.length,
-      timestamp: new Date().toISOString(),
-      items: localRecords,
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || 'Failed to query DynamoDB',
+      },
+      { status: 500 }
+    );
   }
 }

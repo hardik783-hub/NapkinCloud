@@ -346,9 +346,11 @@ const handleJumpToLive = useCallback(() => {
     const data: CompileResponse = await res.json();
 
     if (!res.ok || !data.success) {
-      throw new Error(
-        data.validation?.errors?.join('\n') || 'Compilation failed.'
-      );
+      const errorMsg =
+        data.validation?.errors?.filter(Boolean).join('\n') ||
+        (data as any).error ||
+        'Compilation failed.';
+      throw new Error(errorMsg);
     }
 
     setCompilationResult(data);
@@ -363,19 +365,19 @@ const handleJumpToLive = useCallback(() => {
     console.log('[DEBUG DEPLOYED TABLE]', data.outputs?.OrdersTableName);
 
     setAllNodeStatuses('live', {
-  liveUrl,
-  lambdaArn: lambdaName,
-  liveTableName: tableName || undefined,
-});
+      liveUrl,
+      lambdaArn: lambdaName,
+      liveTableName: tableName || undefined,
+    });
 
     setIsLive(true);
 
   } catch (err: any) {
     console.error('❌ Compile failed:', err);
 
-    alert(`⚠️ [Compilation Error]\n${err.message}`);
+    alert(`⚠️ [AWS Deployment Failed]\n\nReason:\n${err.message}`);
 
-    setAllNodeStatuses('draft');
+    setAllNodeStatuses('failed');
     setIsLive(false);
 
   } finally {
