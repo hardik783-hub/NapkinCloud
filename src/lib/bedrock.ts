@@ -17,6 +17,7 @@ export async function normalizeIntentWithBedrock(
   const rawTableName = (dynamodb.data.tableName as string) || 'OrdersTable';
   const rawPrimaryKey = (dynamodb.data.primaryKey as string) || 'orderId';
 
+  const bearerToken = process.env.AWS_BEARER_TOKEN_BEDROCK;
   const hasCredentials = Boolean(
     process.env.AWS_ACCESS_KEY_ID &&
     process.env.AWS_SECRET_ACCESS_KEY
@@ -24,6 +25,77 @@ export async function normalizeIntentWithBedrock(
 
   const region = process.env.AWS_REGION || 'us-east-1';
 
+  // 1. Bedrock API Key / Bearer Token (Amazon Nova Pro)
+  if (bearerToken) {
+    try {
+      const url = `https://bedrock-runtime.${region}.amazonaws.com/model/amazon.nova-pro-v1:0/invoke`;
+      const systemText = `You are a cloud backend compiler reasoning agent for AWS SAM.
+Analyze the following user-drawn backend architecture:
+- HTTP Route: ${rawMethod} ${rawPath}
+- Function Name: ${rawFunctionName}
+- User Natural Language Logic: "${rawLogic}"
+- Database: DynamoDB Table "${rawTableName}", Partition Key "${rawPrimaryKey}"
+
+Respond ONLY with a valid JSON object matching this exact schema:
+{
+  "sanitizedFunctionName": "AlphanumericFunctionName",
+  "sanitizedTableName": "AlphanumericTableName",
+  "sanitizedPrimaryKey": "primaryKeyName",
+  "sanitizedPath": "/clean-path",
+  "businessLogicSummary": "Brief 1-sentence summary of validated logic",
+  "inferredLogicCode": "clean javascript snippet generating UUID if missing and validating payload"
+}
+Do not include markdown or backticks. Return raw JSON only.`;
+
+      const payload = {
+        system: [{ text: systemText }],
+        messages: [{ role: 'user', content: [{ text: 'Normalize this architecture topology' }] }],
+        inferenceConfig: { temperature: 0.1, max_new_tokens: 1000 },
+      };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.output?.message?.content?.[0]?.text?.trim() || '';
+        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+
+        return {
+          pattern: 'api_lambda_dynamodb',
+          api: {
+            method: rawMethod as any,
+            path: parsed.sanitizedPath || rawPath,
+          },
+          lambda: {
+            functionName: parsed.sanitizedFunctionName || rawFunctionName,
+            runtime: 'nodejs20.x',
+            handlerFile: 'index.js',
+            businessLogicSummary: parsed.businessLogicSummary || rawLogic,
+            inferredLogicCode: parsed.inferredLogicCode || 'const record = { ...body, createdAt: new Date().toISOString() };',
+          },
+          dynamodb: {
+            tableName: parsed.sanitizedTableName || rawTableName,
+            partitionKey: parsed.sanitizedPrimaryKey || rawPrimaryKey,
+            partitionKeyType: 'String',
+          },
+          source: 'bedrock',
+        };
+      }
+    } catch (err) {
+      console.warn('[Bedrock Bearer Normalizer] Failed, trying fallback:', err);
+    }
+  }
+
+  // 2. AWS IAM Key Pair (Claude 3.5 Sonnet / AWS SDK)
   if (hasCredentials) {
     try {
       const client = new BedrockRuntimeClient({ region });

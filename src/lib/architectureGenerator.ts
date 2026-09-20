@@ -191,13 +191,136 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
 export async function generateArchitectureFromPrompt(
   prompt: string
 ): Promise<GeneratedArchitectureResponse> {
-  const hasCredentials = Boolean(
+  const bearerToken = process.env.AWS_BEARER_TOKEN_BEDROCK;
+  const hasAccessKeys = Boolean(
     process.env.AWS_ACCESS_KEY_ID &&
     process.env.AWS_SECRET_ACCESS_KEY
   );
   const region = process.env.AWS_REGION || 'us-east-1';
 
-  if (hasCredentials) {
+  // 1. Bedrock API Key / Bearer Token (Amazon Nova Pro)
+  if (bearerToken) {
+    try {
+      const url = `https://bedrock-runtime.${region}.amazonaws.com/model/amazon.nova-pro-v1:0/invoke`;
+      const systemText = `You are a Principal Cloud Architect specializing in AWS Serverless architectures.
+The user wants to build a backend system described by this natural language prompt:
+"${prompt}"
+
+Produce a standard AWS 3-tier Serverless microservice pattern (API Gateway -> Lambda -> DynamoDB).
+Return ONLY a valid JSON object matching this schema:
+{
+  "application": {
+    "name": "Concise Service Name",
+    "description": "1-sentence description of the service"
+  },
+  "api": {
+    "method": "POST",
+    "path": "/resource"
+  },
+  "lambda": {
+    "functionName": "AlphanumericPascalCaseFunctionName",
+    "businessLogic": "Clear 1-sentence description of what logic executes"
+  },
+  "dynamodb": {
+    "tableName": "AlphanumericPascalCaseTable",
+    "primaryKey": "camelCaseKeyId"
+  },
+  "reasoning": [
+    { "service": "api_gateway", "reason": "Why API Gateway was chosen for this exact prompt" },
+    { "service": "lambda", "reason": "Why Lambda was chosen for this compute task" },
+    { "service": "dynamodb", "reason": "Why DynamoDB was chosen for data persistence" }
+  ]
+}
+Return raw JSON only, no markdown, no quotes, no code fences.`;
+
+      const payload = {
+        system: [{ text: systemText }],
+        messages: [
+          {
+            role: 'user',
+            content: [{ text: `Generate architecture for: "${prompt}"` }],
+          },
+        ],
+        inferenceConfig: {
+          temperature: 0.1,
+          max_new_tokens: 1000,
+        },
+      };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Bedrock Bearer API returned ${res.status}: ${await res.text()}`);
+      }
+
+      const data = await res.json();
+      const rawText = data.output?.message?.content?.[0]?.text || '';
+      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+
+      const method = (parsed.api?.method || 'POST') as HttpMethod;
+      const path = parsed.api?.path?.startsWith('/') ? parsed.api.path : `/${parsed.api?.path || 'items'}`;
+      const functionName = (parsed.lambda?.functionName || 'ProcessFunction').replace(/[^a-zA-Z0-9]/g, '');
+      const businessLogic = parsed.lambda?.businessLogic || 'Processes payload and writes to DynamoDB';
+      const tableName = (parsed.dynamodb?.tableName || 'DataTable').replace(/[^a-zA-Z0-9]/g, '');
+      const primaryKey = (parsed.dynamodb?.primaryKey || 'id').replace(/[^a-zA-Z0-9]/g, '');
+
+      const { nodes, edges } = buildCanvasElements(
+        method,
+        path,
+        functionName,
+        businessLogic,
+        tableName,
+        primaryKey
+      );
+
+      const reasoning: ServiceReasoning[] = Array.isArray(parsed.reasoning) && parsed.reasoning.length === 3
+        ? parsed.reasoning
+        : [
+            { service: 'api_gateway', reason: 'Provides secure HTTPS entry point with managed routing and throttling.' },
+            { service: 'lambda', reason: 'Runs NodeJS serverless logic on-demand with automatic scaling.' },
+            { service: 'dynamodb', reason: 'Managed NoSQL table ensuring fast, predictable write and read latency.' },
+          ];
+
+      return {
+        success: true,
+        source: 'bedrock',
+        prompt,
+        application: {
+          name: parsed.application?.name || 'Serverless Application',
+          description: parsed.application?.description || prompt,
+        },
+        architecture: {
+          nodes: [
+            { id: 'api1', type: 'api_gateway', purpose: `HTTP ${method} endpoint at ${path}` },
+            { id: 'lambda1', type: 'lambda', purpose: businessLogic },
+            { id: 'db1', type: 'dynamodb', purpose: `NoSQL storage partitioned by ${primaryKey}` },
+          ],
+          connections: [
+            { from: 'api1', to: 'lambda1' },
+            { from: 'lambda1', to: 'db1' },
+          ],
+        },
+        reasoning,
+        canvasNodes: nodes,
+        canvasEdges: edges,
+      };
+    } catch (err) {
+      console.warn('[Bedrock Bearer] Generation failed, falling back to rule engine:', err);
+      return fallbackGenerate(prompt);
+    }
+  }
+
+  // 2. AWS IAM Key Pair (Claude 3.5 Sonnet / AWS SDK)
+  if (hasAccessKeys) {
     try {
       const client = new BedrockRuntimeClient({ region });
       const bedrockPrompt = `You are a Principal Cloud Architect specializing in AWS Serverless architectures.
@@ -305,5 +428,6 @@ Return raw JSON only, no markdown, no quotes, no code fences.`;
     }
   }
 
+  // 3. Fallback heuristic engine
   return fallbackGenerate(prompt);
 }
