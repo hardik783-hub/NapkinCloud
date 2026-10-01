@@ -9,6 +9,7 @@ applications:
             - npm ci
         build:
           commands:
+            - env | grep -e NAPKIN_BACKEND_URL >> .env.production
             - npm run build
       artifacts:
         baseDirectory: .next
