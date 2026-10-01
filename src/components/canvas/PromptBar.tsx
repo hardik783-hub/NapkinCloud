@@ -10,7 +10,8 @@ interface PromptBarProps {
     nodes: AppNode[],
     edges: AppEdge[],
     reasoning: ServiceReasoning[],
-    application: { name: string; description: string }
+    application: { name: string; description: string },
+    source?: 'bedrock' | 'offline_rule_engine'
   ) => void;
   disabled?: boolean;
 }
@@ -88,9 +89,12 @@ export default function PromptBar({ onApplyArchitecture, disabled }: PromptBarPr
           data.canvasNodes,
           data.canvasEdges,
           data.reasoning || [],
-          data.application || { name: 'Generated Service', description: activePrompt }
+          data.application || { name: 'Generated Service', description: activePrompt },
+          data.source
         );
-        setStatusMessage(`Bedrock synthesized: ${data.application?.name || 'Architecture'}`);
+        setStatusMessage(
+          `${data.source === 'bedrock' ? 'Bedrock synthesized' : 'Synthesized offline (rule engine)'}: ${data.application?.name || 'Architecture'}`
+        );
         setTimeout(() => setStatusMessage(null), 4500);
       }
     } catch (err) {

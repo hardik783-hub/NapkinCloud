@@ -6,7 +6,7 @@ Globals:
     Runtime: nodejs20.x
     Timeout: 10
 Resources:
-  OrdersApi:
+  NodeApi1:
     Type: AWS::Serverless::Api
     Properties:
       StageName: prod
@@ -14,51 +14,71 @@ Resources:
         AllowMethods: '''*'''
         AllowHeaders: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key'''
         AllowOrigin: '''*'''
-  CreateOrderFunction:
+  NodeS31:
+    Type: AWS::S3::Bucket
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - HEAD
+              - DELETE
+            AllowedOrigins:
+              - '*'
+  NodeSqs1:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 30
+  NodeLambda1:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName:
-        Fn::Sub: ${AWS::StackName}-CreateOrderFunction
+        Fn::Sub: ${AWS::StackName}-UploadFileFunction
       CodeUri:
         Bucket: aws-sam-cli-managed-default-samclisourcebucket-67tausw1jwyw
         Key: placeholder/lambda.zip
       Handler: index.handler
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName:
-              Ref: OrdersTable
+        - S3CrudPolicy:
+            BucketName:
+              Ref: NodeS31
+        - SQSSendMessagePolicy:
+            QueueName:
+              Fn::GetAtt:
+                - NodeSqs1
+                - QueueName
       Environment:
         Variables:
-          TABLE_NAME:
-            Ref: OrdersTable
+          BUCKET_NAME:
+            Ref: NodeS31
+          QUEUE_URL:
+            Ref: NodeSqs1
       Events:
         ApiEvent:
           Type: Api
           Properties:
             RestApiId:
-              Ref: OrdersApi
-            Path: /orders
+              Ref: NodeApi1
+            Path: /upload
             Method: post
-  OrdersTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: orderId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: orderId
-          KeyType: HASH
 Outputs:
   ApiUrl:
     Description: Deployed API endpoint
     Value:
-      Fn::Sub: https://${OrdersApi}.execute-api.${AWS::Region}.amazonaws.com/prod/orders
+      Fn::Sub: https://${NodeApi1}.execute-api.${AWS::Region}.amazonaws.com/prod/upload
   LambdaFunctionName:
     Description: Deployed Lambda function
     Value:
-      Ref: CreateOrderFunction
-  OrdersTableName:
-    Description: Deployed DynamoDB table
+      Ref: NodeLambda1
+  BucketName:
+    Description: Deployed AWS S3 Bucket (BucketName)
     Value:
-      Ref: OrdersTable
+      Ref: NodeS31
+  QueueUrl:
+    Description: Deployed AWS SQS Queue (QueueUrl)
+    Value:
+      Ref: NodeSqs1

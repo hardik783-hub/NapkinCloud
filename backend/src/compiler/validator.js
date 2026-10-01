@@ -1,84 +1,37 @@
-const SUPPORTED_NODE_TYPES = [
-  "api_gateway",
-  "lambda",
-  "dynamodb",
-  "s3",
-  "sqs",
-  "sns",
-  "eventbridge",
-  "cognito",
-  "cloudwatch",
-  "kinesis",
-  "step_functions",
-  "secrets_manager",
-];
+const {
+  validateGraph,
+  SUPPORTED_NODE_TYPES,
+  SERVICE_REGISTRY,
+  inferEdgeKind,
+  nodeData,
+} = require("../../../shared/graphRules");
 
-function validateGraph(graph) {
-  const errors = [];
-
-  if (!graph || typeof graph !== "object") {
-    return {
-      valid: false,
-      errors: ["Graph must be an object"],
-    };
-  }
-
-  if (!Array.isArray(graph.nodes)) {
-    errors.push("nodes must be an array");
-  }
-
-  if (!Array.isArray(graph.edges)) {
-    errors.push("edges must be an array");
-  }
-
-  if (errors.length > 0) {
-    return {
-      valid: false,
-      errors,
-    };
-  }
-
-  const nodeIds = new Set();
-
-  for (const node of graph.nodes) {
-    if (!node.id) {
-      errors.push("Every node must have an id");
-      continue;
-    }
-
-    if (nodeIds.has(node.id)) {
-      errors.push(`Duplicate node id: ${node.id}`);
-    }
-
-    nodeIds.add(node.id);
-
-    if (!SUPPORTED_NODE_TYPES.includes(node.type)) {
-      errors.push(`Unsupported node type: ${node.type}`);
-    }
-  }
-
-  for (const edge of graph.edges) {
-    if (!edge.source || !edge.target) {
-      errors.push("Every edge must have source and target");
-      continue;
-    }
-
-    if (!nodeIds.has(edge.source)) {
-      errors.push(`Edge references unknown source node: ${edge.source}`);
-    }
-
-    if (!nodeIds.has(edge.target)) {
-      errors.push(`Edge references unknown target node: ${edge.target}`);
-    }
-  }
-
+/**
+ * Backend graph validation — thin delegate over the canonical shared rule
+ * set (shared/graphRules.js). The frontend validator, the export validator,
+ * and this backend validator all run the exact same rules, so their
+ * verdicts cannot drift.
+ *
+ * Topology is now enforced here too: exactly one Lambda, at most one API
+ * Gateway, trigger-capable incoming edge for Lambda, storage nodes need an
+ * incoming edge, single connected component. Event-triggered graphs
+ * (S3/SQS/SNS/EventBridge/Kinesis -> Lambda) are valid WITHOUT an API
+ * Gateway — API Gateway is only required when an api_gateway node exists.
+ */
+function validateGraphTopology(graph) {
+  const result = validateGraph(graph);
   return {
-    valid: errors.length === 0,
-    errors,
+    valid: result.valid,
+    errors: result.errors,
+    roles: result.roles,
+    summary: result.summary,
   };
 }
 
 module.exports = {
-  validateGraph,
+  validateGraph: validateGraphTopology,
   SUPPORTED_NODE_TYPES,
+  SERVICE_REGISTRY,
+  inferEdgeKind,
+  nodeData,
 };

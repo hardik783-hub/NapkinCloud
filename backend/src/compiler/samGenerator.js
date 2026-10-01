@@ -1,4 +1,69 @@
-const { validateGraph } = require("./validator");
+/**
+ * Graph-driven SAM template generator.
+ *
+ * Every logical ID derives from the canonical node id + resourceName —
+ * no hard-coded Orders* identifiers. A DynamoDB table is created IFF the
+ * graph contains a dynamodb node (the `database || !s3Node` phantom-table
+ * bug is gone). Wiring (Lambda event sources, IAM policies, env vars) is
+ * derived from the graph's EDGES, not from mere node presence. API Gateway
+ * is only emitted when an api_gateway node exists; event-triggered graphs
+ * (S3/SQS/SNS/EventBridge/Kinesis -> Lambda) compile without one.
+ */
+const {
+  validateGraph,
+  SERVICE_REGISTRY,
+  nodeData,
+} = require("../../../shared/graphRules");
+
+function toLogicalId(nodeId) {
+  const parts = String(nodeId).split(/[^a-zA-Z0-9]+/).filter(Boolean);
+  let out = parts.map((p) => p[0].toUpperCase() + p.slice(1)).join("");
+  if (!out) out = "Node";
+  if (/^[0-9]/.test(out)) out = `N${out}`;
+  return out;
+}
+
+function buildLogicalIds(nodes) {
+  const used = new Set();
+  const map = new Map();
+  for (const node of nodes) {
+    const base = toLogicalId(node.id);
+    let candidate = base;
+    let i = 2;
+    while (used.has(candidate)) candidate = `${base}${i++}`;
+    used.add(candidate);
+    map.set(node.id, candidate);
+  }
+  return map;
+}
+
+function deepReplaceId(value, id) {
+  if (Array.isArray(value)) return value.map((v) => deepReplaceId(v, id));
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = deepReplaceId(v, id);
+    return out;
+  }
+  if (value === "$ID") return id;
+  return value;
+}
+
+function policyArgValue(argSource, logicalId) {
+  if (argSource === "Ref") return { Ref: logicalId };
+  const attr = String(argSource).split(":")[1];
+  return { "Fn::GetAtt": [logicalId, attr] };
+}
+
+function normalizePath(path) {
+  const raw = String(path || "/").trim();
+  if (!raw) return "/";
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
+function sanitizeName(value, fallback) {
+  const clean = String(value || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  return clean || fallback;
+}
 
 function generateSamTemplate(graph) {
   const validation = validateGraph(graph);
@@ -6,28 +71,18 @@ function generateSamTemplate(graph) {
     throw new Error(`Invalid architecture:\n${validation.errors.join("\n")}`);
   }
 
-  const api = graph.nodes.find((node) => node.type === "api_gateway");
-  const lambda = graph.nodes.find((node) => node.type === "lambda");
+  const nodes = graph.nodes;
+  const edges = graph.edges;
 
-  if (!api || !lambda) {
-    throw new Error("Architecture requires at least an API Gateway entry point and a Lambda compute node.");
+  const lambda = nodes.find((node) => node.type === "lambda");
+  if (!lambda) {
+    throw new Error("Architecture requires a Lambda compute node.");
   }
 
-  const database = graph.nodes.find((node) => node.type === "dynamodb");
-  const s3Node = graph.nodes.find((node) => node.type === "s3");
-  const sqsNode = graph.nodes.find((node) => node.type === "sqs");
-  const snsNode = graph.nodes.find((node) => node.type === "sns");
-  const eventBridgeNode = graph.nodes.find((node) => node.type === "eventbridge");
-  const cognitoNode = graph.nodes.find((node) => node.type === "cognito");
-  const secretsNode = graph.nodes.find((node) => node.type === "secrets_manager");
-  const kinesisNode = graph.nodes.find((node) => node.type === "kinesis");
-  const sfnNode = graph.nodes.find((node) => node.type === "step_functions");
-  const cwNode = graph.nodes.find((node) => node.type === "cloudwatch");
-
-  const method = (api.data?.method || api.config?.method || "POST").toLowerCase();
-  const path = api.data?.path || api.config?.path || "/orders";
-  const functionName = lambda.data?.functionName || lambda.config?.functionName || "NapkinCloudFunction";
-  const partitionKey = database?.data?.primaryKey || database?.config?.partitionKey || "id";
+  const logical = buildLogicalIds(nodes);
+  const lambdaLogical = logical.get(lambda.id);
+  const lambdaData = nodeData(lambda);
+  const functionName = sanitizeName(lambdaData.functionName, "NapkinCloudFunction");
 
   const template = {
     AWSTemplateFormatVersion: "2010-09-09",
@@ -39,188 +94,281 @@ function generateSamTemplate(graph) {
         Timeout: 10,
       },
     },
-    Resources: {
-      OrdersApi: {
-        Type: "AWS::Serverless::Api",
-        Properties: {
-          StageName: "prod",
-          Cors: {
-            AllowMethods: "'*'",
-            AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
-            AllowOrigin: "'*'"
-          }
-        },
-      },
-      CreateOrderFunction: {
-        Type: "AWS::Serverless::Function",
-        Properties: {
-          FunctionName: {
-            "Fn::Sub": `\${AWS::StackName}-${functionName}`,
-          },
-          CodeUri: {
-            Bucket: "aws-sam-cli-managed-default-samclisourcebucket-67tausw1jwyw",
-            Key: "placeholder/lambda.zip",
-          },
-          Handler: "index.handler",
-          Policies: [],
-          Environment: {
-            Variables: {},
-          },
-          Events: {
-            ApiEvent: {
-              Type: "Api",
-              Properties: {
-                RestApiId: {
-                  Ref: "OrdersApi",
-                },
-                Path: path,
-                Method: method,
-              },
-            },
-          },
-        },
-      },
-    },
-    Outputs: {
-      ApiUrl: {
-        Description: "Deployed API endpoint",
-        Value: {
-          "Fn::Sub": "https://${OrdersApi}.execute-api.${AWS::Region}.amazonaws.com/prod" + path
-        }
-      },
-      LambdaFunctionName: {
-        Description: "Deployed Lambda function",
-        Value: {
-          Ref: "CreateOrderFunction"
-        }
-      }
-    }
+    Resources: {},
+    Outputs: {},
   };
 
-  if (database || !s3Node) {
-    template.Resources.OrdersTable = {
-      Type: "AWS::DynamoDB::Table",
-      Properties: {
-        BillingMode: "PAY_PER_REQUEST",
-        AttributeDefinitions: [{ AttributeName: partitionKey, AttributeType: "S" }],
-        KeySchema: [{ AttributeName: partitionKey, KeyType: "HASH" }],
-      },
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ DynamoDBCrudPolicy: { TableName: { Ref: "OrdersTable" } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.TABLE_NAME = { Ref: "OrdersTable" };
-    template.Outputs.OrdersTableName = { Description: "Deployed DynamoDB table", Value: { Ref: "OrdersTable" } };
-  }
-
-  if (s3Node) {
-    template.Resources.AppBucket = {
-      Type: "AWS::S3::Bucket",
-      Properties: {
-        CorsConfiguration: {
-          CorsRules: [
-            {
-              AllowedHeaders: ["*"],
-              AllowedMethods: ["GET", "PUT", "POST", "HEAD", "DELETE"],
-              AllowedOrigins: ["*"],
+  // ---------------------------------------------------------------
+  // 1. Base resource per node (nothing for nodes nobody wired yet)
+  // ---------------------------------------------------------------
+  for (const node of nodes) {
+    const id = logical.get(node.id);
+    const d = nodeData(node);
+    switch (node.type) {
+      case "api_gateway": {
+        template.Resources[id] = {
+          Type: "AWS::Serverless::Api",
+          Properties: {
+            StageName: "prod",
+            Cors: {
+              AllowMethods: "'*'",
+              AllowHeaders:
+                "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+              AllowOrigin: "'*'",
             },
-          ],
-        },
-      },
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ S3CrudPolicy: { BucketName: { Ref: "AppBucket" } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.BUCKET_NAME = { Ref: "AppBucket" };
-    template.Outputs.BucketName = { Description: "Deployed S3 Bucket", Value: { Ref: "AppBucket" } };
-  }
-
-  if (sqsNode) {
-    template.Resources.AppQueue = {
-      Type: "AWS::SQS::Queue",
-      Properties: {
-        VisibilityTimeout: 30,
-      },
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ SQSSendMessagePolicy: { QueueName: { "Fn::GetAtt": ["AppQueue", "QueueName"] } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.QUEUE_URL = { Ref: "AppQueue" };
-    template.Outputs.QueueUrl = { Description: "Deployed SQS Queue URL", Value: { Ref: "AppQueue" } };
-  }
-
-  if (snsNode) {
-    template.Resources.AppTopic = { Type: "AWS::SNS::Topic" };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ SNSPublishMessagePolicy: { TopicName: { "Fn::GetAtt": ["AppTopic", "TopicName"] } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.TOPIC_ARN = { Ref: "AppTopic" };
-    template.Outputs.TopicArn = { Description: "Deployed SNS Topic ARN", Value: { Ref: "AppTopic" } };
-  }
-
-  if (eventBridgeNode) {
-    template.Resources.AppEventBus = {
-      Type: "AWS::Events::EventBus",
-      Properties: { Name: { "Fn::Sub": "${AWS::StackName}-eventbus" } }
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ EventBridgePutEventsPolicy: { EventBusName: { Ref: "AppEventBus" } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.EVENT_BUS_NAME = { Ref: "AppEventBus" };
-    template.Outputs.EventBusName = { Description: "Deployed EventBridge Bus", Value: { Ref: "AppEventBus" } };
-  }
-
-  if (cognitoNode) {
-    template.Resources.AppUserPool = {
-      Type: "AWS::Cognito::UserPool",
-      Properties: { UserPoolName: { "Fn::Sub": "${AWS::StackName}-userpool" } }
-    };
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.USER_POOL_ID = { Ref: "AppUserPool" };
-    template.Outputs.UserPoolId = { Description: "Deployed Cognito User Pool ID", Value: { Ref: "AppUserPool" } };
-  }
-
-  if (secretsNode) {
-    template.Resources.AppSecret = {
-      Type: "AWS::SecretsManager::Secret",
-      Properties: { Description: "Generated secret for NapkinCloud application" }
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ SecretsManagerReadWritePolicy: { SecretArn: { Ref: "AppSecret" } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.SECRET_ARN = { Ref: "AppSecret" };
-    template.Outputs.SecretArn = { Description: "Deployed Secret ARN", Value: { Ref: "AppSecret" } };
-  }
-
-  if (kinesisNode) {
-    template.Resources.AppStream = {
-      Type: "AWS::Kinesis::Stream",
-      Properties: { ShardCount: 1 }
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ KinesisCrudPolicy: { StreamName: { Ref: "AppStream" } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.STREAM_NAME = { Ref: "AppStream" };
-    template.Outputs.StreamName = { Description: "Deployed Kinesis Stream", Value: { Ref: "AppStream" } };
-  }
-
-  if (sfnNode) {
-    template.Resources.AppStateMachine = {
-      Type: "AWS::Serverless::StateMachine",
-      Properties: {
-        Definition: {
-          StartAt: "InitialState",
-          States: { InitialState: { Type: "Pass", End: true } }
-        },
-        Policies: ["CloudWatchLogsFullAccess"]
+          },
+        };
+        break;
       }
-    };
-    template.Resources.CreateOrderFunction.Properties.Policies.push({ StepFunctionsExecutionPolicy: { StateMachineName: { "Fn::GetAtt": ["AppStateMachine", "Name"] } } });
-    template.Resources.CreateOrderFunction.Properties.Environment.Variables.STATE_MACHINE_ARN = { Ref: "AppStateMachine" };
-    template.Outputs.StateMachineArn = { Description: "Deployed State Machine ARN", Value: { Ref: "AppStateMachine" } };
+      case "lambda":
+        // emitted below once triggers/policies are known
+        break;
+      case "dynamodb": {
+        const pk = String(d.primaryKey || "id").replace(/[^a-zA-Z0-9_]/g, "") || "id";
+        template.Resources[id] = {
+          Type: "AWS::DynamoDB::Table",
+          Properties: {
+            BillingMode: "PAY_PER_REQUEST",
+            AttributeDefinitions: [{ AttributeName: pk, AttributeType: "S" }],
+            KeySchema: [{ AttributeName: pk, KeyType: "HASH" }],
+          },
+        };
+        break;
+      }
+      case "s3": {
+        template.Resources[id] = {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            CorsConfiguration: {
+              CorsRules: [
+                {
+                  AllowedHeaders: ["*"],
+                  AllowedMethods: ["GET", "PUT", "POST", "HEAD", "DELETE"],
+                  AllowedOrigins: ["*"],
+                },
+              ],
+            },
+          },
+        };
+        break;
+      }
+      case "sqs": {
+        template.Resources[id] = {
+          Type: "AWS::SQS::Queue",
+          Properties: { VisibilityTimeout: 30 },
+        };
+        break;
+      }
+      case "sns": {
+        template.Resources[id] = { Type: "AWS::SNS::Topic" };
+        break;
+      }
+      case "eventbridge": {
+        template.Resources[id] = {
+          Type: "AWS::Events::EventBus",
+          Properties: {
+            Name:
+              "${AWS::StackName}-" + sanitizeName(d.resourceName, "eventbus"),
+          },
+        };
+        break;
+      }
+      case "cognito": {
+        template.Resources[id] = {
+          Type: "AWS::Cognito::UserPool",
+          Properties: {
+            UserPoolName:
+              "${AWS::StackName}-" + sanitizeName(d.resourceName, "userpool"),
+          },
+        };
+        break;
+      }
+      case "kinesis": {
+        template.Resources[id] = {
+          Type: "AWS::Kinesis::Stream",
+          Properties: { ShardCount: 1 },
+        };
+        break;
+      }
+      case "step_functions": {
+        template.Resources[id] = {
+          Type: "AWS::Serverless::StateMachine",
+          Properties: {
+            Definition: {
+              StartAt: "InitialState",
+              States: { InitialState: { Type: "Pass", End: true } },
+            },
+            Policies: ["CloudWatchLogsFullAccess"],
+          },
+        };
+        break;
+      }
+      case "secrets_manager": {
+        template.Resources[id] = {
+          Type: "AWS::SecretsManager::Secret",
+          Properties: {
+            Description: `Generated secret (${sanitizeName(d.resourceName, "secret")}) for NapkinCloud application`,
+          },
+        };
+        break;
+      }
+      case "cloudwatch":
+        // alarm requires the Lambda reference — emitted below
+        break;
+      default:
+        break;
+    }
   }
 
+  // ---------------------------------------------------------------
+  // 2. Edge-driven wiring (the graph decides, not node presence)
+  // ---------------------------------------------------------------
+  let apiEvent = null; // { node }
+  const triggerSources = []; // event-source nodes with edge -> lambda
+  const actionTargets = []; // nodes with edge lambda -> node
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+  for (const edge of edges) {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (!source || !target) continue;
+
+    if (target.id === lambda.id && source.type !== "lambda") {
+      if (source.type === "api_gateway") {
+        apiEvent = { node: source };
+      } else {
+        const def = SERVICE_REGISTRY.services[source.type];
+        if (def && def.lambdaEvent) triggerSources.push({ node: source, def });
+      }
+    } else if (source.id === lambda.id && target.type !== "lambda") {
+      actionTargets.push({ node: target });
+    }
+  }
+
+  // Lambda events: API route + every trigger edge
+  const events = {};
+  let apiPath = "/";
+  if (apiEvent) {
+    const apiLogical = logical.get(apiEvent.node.id);
+    const d = nodeData(apiEvent.node);
+    const method = String(d.method || "POST").toLowerCase();
+    apiPath = normalizePath(d.path);
+    events.ApiEvent = {
+      Type: "Api",
+      Properties: {
+        RestApiId: { Ref: apiLogical },
+        Path: apiPath,
+        Method: method,
+      },
+    };
+  }
+  for (const { node, def } of triggerSources) {
+    const id = logical.get(node.id);
+    events[`${id}Trigger`] = deepReplaceId(def.lambdaEvent, id);
+  }
+
+  // Lambda policies + env vars: only for nodes the Lambda points AT
+  const policies = [];
+  const envVars = {};
+  for (const { node } of actionTargets) {
+    const def = SERVICE_REGISTRY.services[node.type];
+    if (!def) continue;
+    const id = logical.get(node.id);
+    if (def.lambdaEnvVar) envVars[def.lambdaEnvVar] = { Ref: id };
+    if (def.lambdaPolicy) {
+      policies.push({
+        [def.lambdaPolicy.template]: {
+          [def.lambdaPolicy.argName]: policyArgValue(def.lambdaPolicy.argSource, id),
+        },
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // 3. Lambda resource
+  // ---------------------------------------------------------------
+  template.Resources[lambdaLogical] = {
+    Type: "AWS::Serverless::Function",
+    Properties: {
+      FunctionName: {
+        "Fn::Sub": "${AWS::StackName}-" + functionName,
+      },
+      CodeUri: {
+        Bucket: "aws-sam-cli-managed-default-samclisourcebucket-67tausw1jwyw",
+        Key: "placeholder/lambda.zip",
+      },
+      Handler: "index.handler",
+      Policies: policies,
+      Environment: { Variables: envVars },
+      Events: events,
+    },
+  };
+
+  // ---------------------------------------------------------------
+  // 4. Monitoring (CloudWatch alarm node watches the Lambda)
+  // ---------------------------------------------------------------
+  const cwNode = nodes.find((n) => n.type === "cloudwatch");
   if (cwNode) {
-    template.Resources.AppAlarm = {
+    const alarmLogical = logical.get(cwNode.id);
+    template.Resources[alarmLogical] = {
       Type: "AWS::CloudWatch::Alarm",
       Properties: {
         AlarmDescription: "Alarm for Lambda errors",
         Namespace: "AWS/Lambda",
         MetricName: "Errors",
-        Dimensions: [{ Name: "FunctionName", Value: { Ref: "CreateOrderFunction" } }],
+        Dimensions: [{ Name: "FunctionName", Value: { Ref: lambdaLogical } }],
         Statistic: "Sum",
         Period: 60,
         EvaluationPeriods: 1,
         Threshold: 1,
-        ComparisonOperator: "GreaterThanOrEqualToThreshold"
-      }
+        ComparisonOperator: "GreaterThanOrEqualToThreshold",
+      },
     };
-    template.Outputs.AlarmName = { Description: "Deployed CloudWatch Alarm", Value: { Ref: "AppAlarm" } };
+    template.Outputs.AlarmName = {
+      Description: "Deployed CloudWatch Alarm",
+      Value: { Ref: alarmLogical },
+    };
+  }
+
+  // ---------------------------------------------------------------
+  // 5. Outputs (generic, keyed by resource role)
+  // ---------------------------------------------------------------
+  if (apiEvent) {
+    const apiLogical = logical.get(apiEvent.node.id);
+    template.Outputs.ApiUrl = {
+      Description: "Deployed API endpoint",
+      Value: {
+        "Fn::Sub":
+          "https://${" +
+          apiLogical +
+          "}.execute-api.${AWS::Region}.amazonaws.com/prod" +
+          apiPath,
+      },
+    };
+  }
+
+  template.Outputs.LambdaFunctionName = {
+    Description: "Deployed Lambda function",
+    Value: { Ref: lambdaLogical },
+  };
+
+  for (const node of nodes) {
+    if (
+      node.type === "lambda" ||
+      node.type === "api_gateway" ||
+      node.type === "cloudwatch"
+    ) {
+      continue;
+    }
+    const def = SERVICE_REGISTRY.services[node.type];
+    if (!def) continue;
+    const id = logical.get(node.id);
+    for (const key of def.outputKeys || []) {
+      template.Outputs[key] = {
+        Description: `Deployed ${def.label} (${key})`,
+        Value: { Ref: id },
+      };
+    }
   }
 
   return template;
@@ -228,5 +376,5 @@ function generateSamTemplate(graph) {
 
 module.exports = {
   generateSamTemplate,
+  toLogicalId,
 };
-

@@ -27,6 +27,16 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
   };
 
   const norm = data.normalizedArchitecture;
+  const graph = data.graph;
+  const apiInfo =
+    graph?.api ?? (norm ? { method: norm.api.method, path: norm.api.path } : undefined);
+  const lambdaName = graph?.lambda ?? norm?.lambda.functionName;
+  const otherServices = (graph?.services ?? []).filter(
+    (s) => s !== 'api_gateway' && s !== 'lambda'
+  );
+  const serviceCount = graph?.nodeCount ?? data.reasoning?.length;
+  const isBedrock = data.source === 'bedrock' || norm?.source === 'bedrock';
+  const isDryRun = data.status === 'DRY_RUN';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -43,11 +53,16 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
                   Compilation Complete — AWS Artifacts Generated
                 </h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold uppercase">
-                  {norm?.source === 'bedrock' ? 'Amazon Bedrock' : 'Deterministic Engine'}
+                  {isDryRun
+                    ? 'Dry Run · No AWS Deployment'
+                    : isBedrock
+                    ? 'Amazon Bedrock'
+                    : 'Deterministic Engine'}
                 </span>
               </div>
               <p className="text-xs text-[#888888] font-sans mt-0.5">
-                Project: <code className="text-cyan-400 font-mono text-[11px]">{data.projectId}</code> • 3 AWS Services Synthesized
+                Project: <code className="text-cyan-400 font-mono text-[11px]">{data.projectId}</code>{' '}
+                • {serviceCount ? `${serviceCount} AWS Services Synthesized` : 'AWS Artifacts Generated'}
               </p>
             </div>
           </div>
@@ -59,20 +74,28 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
           </button>
         </div>
 
-        {/* Architecture Specs Callout */}
-        {norm && (
+        {/* Architecture Specs Callout — derived from the canonical graph */}
+        {(apiInfo || lambdaName || otherServices.length > 0 || norm) && (
           <div className="my-3 grid grid-cols-3 gap-3">
             <div className="p-2.5 rounded-lg bg-[#050505] border border-[#202020] text-xs font-mono">
-              <span className="text-[#888888] text-[10px] block uppercase font-medium">HTTP Route</span>
-              <span className="text-cyan-400 font-bold">{norm.api.method} {norm.api.path}</span>
+              <span className="text-[#888888] text-[10px] block uppercase font-medium">Entry Point</span>
+              <span className="text-cyan-400 font-bold">
+                {apiInfo ? `${apiInfo.method} ${apiInfo.path}` : 'Event-triggered'}
+              </span>
             </div>
             <div className="p-2.5 rounded-lg bg-[#050505] border border-[#202020] text-xs font-mono">
               <span className="text-[#888888] text-[10px] block uppercase font-medium">Lambda Function</span>
-              <span className="text-amber-400 font-bold">{norm.lambda.functionName}</span>
+              <span className="text-amber-400 font-bold truncate block">{lambdaName || '—'}</span>
             </div>
             <div className="p-2.5 rounded-lg bg-[#050505] border border-[#202020] text-xs font-mono">
-              <span className="text-[#888888] text-[10px] block uppercase font-medium">DynamoDB Table</span>
-              <span className="text-indigo-400 font-bold">{norm.dynamodb.tableName} ({norm.dynamodb.partitionKey})</span>
+              <span className="text-[#888888] text-[10px] block uppercase font-medium">Bound Services</span>
+              <span className="text-emerald-400 font-bold truncate block">
+                {otherServices.length > 0
+                  ? otherServices.join(', ')
+                  : norm
+                  ? 'dynamodb'
+                  : '—'}
+              </span>
             </div>
           </div>
         )}
@@ -140,11 +163,13 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto mt-3 rounded-lg bg-[#050505] border border-[#202020] p-4">
-          {activeTab === 'reasoning' && data.reasoning ? (
+          {activeTab === 'reasoning' && data.reasoning && data.reasoning.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-[#222222] text-xs text-[#888888] font-mono">
-                <span>Bedrock Architectural Decisions (P0 Microservice Topology)</span>
-                <span className="text-purple-400 font-bold">Hardik Schema #3</span>
+                <span>Architecture Decisions (canonical graph topology)</span>
+                <span className="text-purple-400 font-bold">
+                  {isBedrock ? 'Amazon Bedrock' : 'Rule Engine'}
+                </span>
               </div>
               {data.reasoning.map((item, idx) => (
                 <div
@@ -173,7 +198,7 @@ export default function CompilationModal({ data, onClose }: CompilationModalProp
         <div className="flex items-center justify-between pt-4 border-t border-[#222222] mt-4">
           <div className="flex items-center gap-2 text-xs text-[#888888] font-mono">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Ready for Step Functions / CloudFormation deployment</span>
+            <span>Artifacts generated from the canonical graph</span>
           </div>
           <button
             onClick={onClose}

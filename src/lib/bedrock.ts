@@ -18,12 +18,12 @@ export async function normalizeIntentWithBedrock(
 ): Promise<NormalizedArchitecture> {
   const { api, lambda, dynamodb } = validatedNodes;
 
-  const rawPath = (api.data.path as string) || '/orders';
+  const rawPath = (api.data.path as string) || '/';
   const rawMethod = (api.data.method as string) || 'POST';
-  const rawFunctionName = (lambda.data.functionName as string) || 'ProcessOrderFunction';
+  const rawFunctionName = (lambda.data.functionName as string) || 'ProcessFunction';
   const rawLogic = (lambda.data.businessLogic as string) || 'Validates incoming payload and writes item to database';
-  const rawTableName = (dynamodb.data.tableName as string) || 'OrdersTable';
-  const rawPrimaryKey = (dynamodb.data.primaryKey as string) || 'orderId';
+  const rawTableName = (dynamodb.data.tableName as string) || 'DataTable';
+  const rawPrimaryKey = (dynamodb.data.primaryKey as string) || 'id';
 
   const bearerToken = process.env.AWS_BEARER_TOKEN_BEDROCK;
   const hasCredentials = Boolean(
@@ -172,7 +172,7 @@ Do not include markdown or backticks. Return raw JSON only.`;
 
   // Deterministic Fallback Engine (Zero-Fail Guarantee)
   const cleanPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
-  const cleanFnName = rawFunctionName.replace(/[^a-zA-Z0-9]/g, '') || 'DefaultOrderFunction';
+  const cleanFnName = rawFunctionName.replace(/[^a-zA-Z0-9]/g, '') || 'DefaultFunction';
   const cleanTableName = rawTableName.replace(/[^a-zA-Z0-9_.-]/g, '') || 'AppTable';
   const cleanPk = rawPrimaryKey.replace(/[^a-zA-Z0-9_]/g, '') || 'id';
 

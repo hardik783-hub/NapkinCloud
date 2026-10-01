@@ -1,5 +1,10 @@
 import type { AppNode, AppEdge } from '@/types/canvas';
-import type { TeammateArchitecture, ServiceReasoning } from '@/types/compiler';
+import type { ServiceReasoning } from '@/types/compiler';
+import {
+  validateNodesEdges,
+  inferEdgeKind,
+  nodeData,
+} from '../../shared/graphRules.js';
 
 export interface ExportedGraph {
   version: string;
@@ -18,6 +23,7 @@ export interface ExportedGraph {
     connections: Array<{
       from: string;
       to: string;
+      kind: string;
     }>;
   };
   reasoning: ServiceReasoning[];
@@ -31,6 +37,7 @@ export interface ExportedGraph {
     id: string;
     source: string;
     target: string;
+    kind: string;
   }>;
   validation: {
     isValidP0: boolean;
@@ -40,36 +47,76 @@ export interface ExportedGraph {
   };
 }
 
+/** Human-readable purpose for a node, derived from its own data. */
+function purposeFor(node: AppNode): string {
+  const d = nodeData(node);
+  if (typeof d.purpose === 'string' && d.purpose.trim()) return d.purpose;
+  switch (node.type) {
+    case 'api_gateway':
+      return `HTTP ${d.method || 'GET'} ${d.path || '/'} endpoint`;
+    case 'lambda':
+      return (
+        (typeof d.businessLogic === 'string' && d.businessLogic) ||
+        `Serverless function${d.functionName ? ` ${d.functionName}` : ''}`
+      );
+    case 'dynamodb':
+      return `NoSQL table ${d.tableName || '(unnamed)'} partitioned by ${d.primaryKey || 'id'}`;
+    default:
+      return (
+        (typeof d.subLabel === 'string' && d.subLabel) ||
+        (typeof d.label === 'string' && d.label) ||
+        String(node.type)
+      );
+  }
+}
+
+/** Application metadata derived from the graph — never a hard-coded project. */
+function applicationFor(nodes: AppNode[]): { name: string; description: string } {
+  const api = nodes.find((n) => n.type === 'api_gateway');
+  const lambda = nodes.find((n) => n.type === 'lambda');
+  const d = api ? nodeData(api) : {};
+  const path = typeof d.path === 'string' ? d.path : '';
+  const method = typeof d.method === 'string' ? d.method : 'POST';
+  const base = path.replace(/^\//, '').replace(/[-_/]/g, ' ').trim();
+
+  if (api && base) {
+    const title = base.replace(/\b\w/g, (c) => c.toUpperCase());
+    return {
+      name: `${title} API Service`,
+      description: `Serverless API (${method} ${path}) backed by AWS Lambda and the services in this graph.`,
+    };
+  }
+  const lambdaData = lambda ? nodeData(lambda) : {};
+  const fnName =
+    typeof lambdaData.functionName === 'string' ? lambdaData.functionName : 'Generated';
+  return {
+    name: `${fnName} Service`,
+    description: 'Serverless AWS service graph generated on the NapkinCloud canvas.',
+  };
+}
+
+/** Default reasoning: one entry per node, derived from the node itself. */
+function defaultReasoningFor(nodes: AppNode[]): ServiceReasoning[] {
+  return nodes.map((node) => ({
+    service: node.type || 'unknown',
+    reason: purposeFor(node),
+  }));
+}
+
+/**
+ * Export the canvas graph as JSON.
+ *
+ * Validation now delegates to the canonical shared rule set — there is no
+ * longer a DynamoDB mandate. `architecture.nodes`/`connections` and the
+ * serialized `nodes`/`edges` arrays reflect the canvas graph exactly.
+ */
 export function exportGraphToJson(
   nodes: AppNode[],
   edges: AppEdge[],
-  projectId: string = 'proj-demo-orders',
+  projectId: string = 'proj-canvas',
   customReasoning?: ServiceReasoning[]
 ): ExportedGraph {
-  const errors: string[] = [];
-
-  const apiNode = nodes.find((n) => n.type === 'api_gateway');
-  const lambdaNode = nodes.find((n) => n.type === 'lambda');
-  const dynamoNode = nodes.find((n) => n.type === 'dynamodb');
-
-  if (!apiNode) errors.push('Missing API Gateway trigger node.');
-  if (!lambdaNode) errors.push('Missing Lambda serverless compute node.');
-  if (!dynamoNode) errors.push('Missing DynamoDB database table node.');
-
-  const hasApiToLambda = edges.some((e) => {
-    const s = nodes.find((n) => n.id === e.source);
-    const t = nodes.find((n) => n.id === e.target);
-    return s?.type === 'api_gateway' && t?.type === 'lambda';
-  });
-
-  const hasLambdaToDynamo = edges.some((e) => {
-    const s = nodes.find((n) => n.id === e.source);
-    const t = nodes.find((n) => n.id === e.target);
-    return s?.type === 'lambda' && t?.type === 'dynamodb';
-  });
-
-  if (!hasApiToLambda) errors.push('API Gateway must connect to a Lambda function.');
-  if (!hasLambdaToDynamo) errors.push('Lambda must connect to a DynamoDB table.');
+  const result = validateNodesEdges(nodes, edges);
 
   const serializedNodes = nodes.map((node) => ({
     id: node.id,
@@ -78,74 +125,50 @@ export function exportGraphToJson(
     properties: { ...node.data },
   }));
 
+  const typeById = new Map(nodes.map((n) => [n.id, n.type]));
+
   const serializedEdges = edges.map((edge) => ({
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    kind: inferEdgeKind(
+      String(typeById.get(edge.source) || ''),
+      String(typeById.get(edge.target) || ''),
+      (edge.data as { kind?: string } | undefined)?.kind
+    ),
   }));
-
-  const apiPath = (apiNode?.data?.path as string) || '/orders';
-  const apiMethod = (apiNode?.data?.method as string) || 'POST';
-  const lambdaFunc = (lambdaNode?.data?.functionName as string) || 'ProcessOrderFunction';
-  const lambdaLogic = (lambdaNode?.data?.businessLogic as string) || 'Process order requests';
-  const dbTable = (dynamoNode?.data?.tableName as string) || 'OrdersTable';
-  const dbKey = (dynamoNode?.data?.primaryKey as string) || 'orderId';
-
-  const defaultReasoning: ServiceReasoning[] = [
-    {
-      service: 'api_gateway',
-      reason: `Exposes HTTPS ${apiMethod} ${apiPath} endpoint with built-in throttling, request validation, and CORS.`,
-    },
-    {
-      service: 'lambda',
-      reason: `Executes serverless NodeJS compute (${lambdaFunc}) to run business logic on demand.`,
-    },
-    {
-      service: 'dynamodb',
-      reason: `NoSQL key-value store (${dbTable}) partitioned by ${dbKey} for sub-10ms writes and persistent order storage.`,
-    },
-  ];
 
   return {
     version: '1.0',
     projectId,
     timestamp: new Date().toISOString(),
-    application: {
-      name: `${apiPath.replace(/^\//, '').toUpperCase() || 'Orders'} API Service`,
-      description: `Serverless API for processing and storing ${apiPath.replace(/^\//, '') || 'orders'}`,
-    },
+    application: applicationFor(nodes),
     architecture: {
-      nodes: [
-        {
-          id: apiNode?.id || 'api',
-          type: 'api_gateway',
-          purpose: `HTTP API endpoint for ${apiMethod} ${apiPath}`,
-        },
-        {
-          id: lambdaNode?.id || 'orders_service',
-          type: 'lambda',
-          purpose: lambdaLogic,
-        },
-        {
-          id: dynamoNode?.id || 'orders_db',
-          type: 'dynamodb',
-          purpose: `Store items in ${dbTable} indexed by ${dbKey}`,
-        },
-      ],
-      connections: edges.map((e) => ({
-        from: e.source,
-        to: e.target,
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: node.type || 'unknown',
+        purpose: purposeFor(node),
+      })),
+      connections: edges.map((edge) => ({
+        from: edge.source,
+        to: edge.target,
+        kind: inferEdgeKind(
+          String(typeById.get(edge.source) || ''),
+          String(typeById.get(edge.target) || ''),
+          (edge.data as { kind?: string } | undefined)?.kind
+        ),
       })),
     },
-    reasoning: customReasoning || defaultReasoning,
+    reasoning: customReasoning && customReasoning.length > 0
+      ? customReasoning
+      : defaultReasoningFor(nodes),
     nodes: serializedNodes,
     edges: serializedEdges,
     validation: {
-      isValidP0: errors.length === 0,
-      nodeCount: nodes.length,
-      edgeCount: edges.length,
-      errors,
+      isValidP0: result.valid,
+      nodeCount: result.summary.nodeCount,
+      edgeCount: result.summary.edgeCount,
+      errors: result.errors,
     },
   };
 }
-

@@ -24,15 +24,15 @@ export default function ArchitectExplainerCard({
   const defaultReasoning: ServiceReasoning[] = [
     {
       service: 'api_gateway',
-      reason: 'Exposes a secure HTTPS REST endpoint (/orders) with built-in request throttling, CORS, and routing.',
+      reason: 'Exposes a secure HTTPS REST endpoint with built-in request throttling, CORS, and routing.',
     },
     {
       service: 'lambda',
-      reason: 'Serverless compute executes your order logic on-demand. Auto-scales from zero with zero idle server costs.',
+      reason: 'Serverless compute executes your business logic on-demand. Auto-scales from zero with zero idle server costs.',
     },
     {
       service: 'dynamodb',
-      reason: 'Managed NoSQL key-value store partitioned by orderId for predictable sub-10ms read/write latency.',
+      reason: 'Managed NoSQL key-value store partitioned by your primary key for predictable sub-10ms read/write latency.',
     },
   ];
 
@@ -60,11 +60,11 @@ export default function ArchitectExplainerCard({
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-[#EDEDED] tracking-tight font-sans">AI Architect</span>
                 <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                  Bedrock Agent
+                  Architecture Agent
                 </span>
               </div>
               <p className="text-[10px] text-[#888888] font-sans truncate max-w-[170px]">
-                {application?.name || 'Order Processing Service'}
+                {application?.name || 'Generated Service'}
               </p>
             </div>
           </div>

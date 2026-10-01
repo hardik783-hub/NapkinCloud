@@ -1,57 +1,148 @@
-function generateLambdaCode(lambdaNode, databaseNode, allNodes = []) {
-  const functionName = lambdaNode.data?.functionName || lambdaNode.config?.functionName || "NapkinCloudFunction";
-
-  const logic = lambdaNode.data?.businessLogic || lambdaNode.config?.logic || "Process the incoming request";
-
-  const tableName = databaseNode?.data?.tableName || databaseNode?.config?.tableName || "NapkinCloudTable";
-
-  const partitionKey = databaseNode?.data?.primaryKey || databaseNode?.config?.partitionKey || "id";
-
-  const hasS3 = allNodes.some((n) => n.type === "s3");
-  const hasSQS = allNodes.some((n) => n.type === "sqs");
-  const hasSNS = allNodes.some((n) => n.type === "sns");
-  const hasEventBridge = allNodes.some((n) => n.type === "eventbridge");
-  const hasDynamoDB = allNodes.some((n) => n.type === "dynamodb");
-
-  return `const {
-  DynamoDBClient
-} = require("@aws-sdk/client-dynamodb");
-
+/**
+ * Graph-driven Lambda handler generation.
+ *
+ * Everything is derived from the canonical graph:
+ *   - SDK imports are emitted ONLY for services the Lambda actually
+ *     writes to (an S3-only graph gets no DynamoDB client at all).
+ *   - The GET branch is graph-aware (DynamoDB scan / S3 list / fallback).
+ *   - Trigger edges (S3/SQS/SNS/EventBridge/Kinesis -> Lambda) add an
+ *     event-processing path; HTTP CORS behavior is preserved.
+ *   - All snippets are joined with REAL newlines — the historical bug of
+ *     literal "\n" sequences leaking into generated source is gone.
+ *
+ * Signature: generateLambdaCode(graph) where graph = { nodes, edges }.
+ */
 const {
-  DynamoDBDocumentClient,
-  PutCommand,
-  ScanCommand,
-  DeleteCommand
-} = require("@aws-sdk/lib-dynamodb");
+  SERVICE_REGISTRY,
+  nodeData,
+} = require("../../../shared/graphRules");
 
-const {
-  randomUUID
-} = require("crypto");
+function sanitize(value, fallback) {
+  const clean = String(value || "").replace(/[^a-zA-Z0-9]/g, "");
+  return clean || fallback;
+}
 
-${hasS3 ? 'const { S3Client, PutObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");\\nconst s3 = new S3Client({});\\n' : ''}${hasSQS ? 'const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");\\nconst sqs = new SQSClient({});\\n' : ''}${hasSNS ? 'const { SNSClient, PublishCommand } = require("@aws-sdk/client-sns");\\nconst sns = new SNSClient({});\\n' : ''}${hasEventBridge ? 'const { EventBridgeClient, PutEventsCommand } = require("@aws-sdk/client-eventbridge");\\nconst eventbridge = new EventBridgeClient({});\\n' : ''}const client = new DynamoDBClient({});
+function singleLine(value, fallback) {
+  const clean = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean || fallback;
+}
 
-const dynamodb =
-  DynamoDBDocumentClient.from(client);
+function generateLambdaCode(graph) {
+  if (!graph || !Array.isArray(graph.nodes)) {
+    throw new Error("generateLambdaCode requires a graph with nodes[]");
+  }
+  const nodes = graph.nodes;
+  const edges = Array.isArray(graph.edges) ? graph.edges : [];
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
 
-exports.handler = async (event) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
-    "Access-Control-Allow-Methods": "*"
-  };
-
-  const httpMethod = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || "POST").toUpperCase();
-
-  if (httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: ""
-    };
+  const lambda = nodes.find((n) => n.type === "lambda");
+  if (!lambda) {
+    throw new Error("generateLambdaCode requires a lambda node in the graph");
   }
 
-  try {
-    if (httpMethod === "GET") {
+  const lambdaData = nodeData(lambda);
+  const functionName = sanitize(lambdaData.functionName, "NapkinCloudFunction");
+  const logic = singleLine(
+    lambdaData.businessLogic || lambdaData.logic,
+    "Process the incoming request"
+  );
+
+  // ---- classify edges (direction decides the wiring) ----
+  let hasDynamo = false;
+  let writesS3 = false;
+  let sendsSqs = false;
+  let publishesSns = false;
+  let putsEventBridge = false;
+  let writesKinesis = false;
+  let hasTrigger = false;
+
+  for (const edge of edges) {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (!source || !target) continue;
+
+    if (String(source.id) === String(lambda.id) && String(target.type) !== "lambda") {
+      switch (target.type) {
+        case "dynamodb":
+          hasDynamo = true;
+          break;
+        case "s3":
+          writesS3 = true;
+          break;
+        case "sqs":
+          sendsSqs = true;
+          break;
+        case "sns":
+          publishesSns = true;
+          break;
+        case "eventbridge":
+          putsEventBridge = true;
+          break;
+        case "kinesis":
+          writesKinesis = true;
+          break;
+        default:
+          break;
+      }
+    } else if (String(target.id) === String(lambda.id) && String(source.type) !== "lambda") {
+      const def = SERVICE_REGISTRY.services[source.type];
+      if (def && def.lambdaEvent) hasTrigger = true;
+    }
+  }
+
+  const dynamoNode = nodes.find(
+    (n) =>
+      n.type === "dynamodb" &&
+      edges.some((e) => e.source === lambda.id && e.target === n.id)
+  );
+  const partitionKey =
+    String(nodeData(dynamoNode || {}).primaryKey || "id").replace(
+      /[^a-zA-Z0-9_]/g,
+      ""
+    ) || "id";
+
+  // ---- imports (only what this graph actually uses) ----
+  const imports = ['const { randomUUID } = require("crypto");'];
+  if (hasDynamo) {
+    imports.push('const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");');
+    imports.push(
+      'const {\n  DynamoDBDocumentClient,\n  PutCommand,\n  ScanCommand,\n  DeleteCommand\n} = require("@aws-sdk/lib-dynamodb");'
+    );
+    imports.push("const client = new DynamoDBClient({});");
+    imports.push("const dynamodb = DynamoDBDocumentClient.from(client);");
+  }
+  if (writesS3) {
+    imports.push(
+      'const { S3Client, PutObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");'
+    );
+    imports.push("const s3 = new S3Client({});");
+  }
+  if (sendsSqs) {
+    imports.push('const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");');
+    imports.push("const sqs = new SQSClient({});");
+  }
+  if (publishesSns) {
+    imports.push('const { SNSClient, PublishCommand } = require("@aws-sdk/client-sns");');
+    imports.push("const sns = new SNSClient({});");
+  }
+  if (putsEventBridge) {
+    imports.push(
+      'const { EventBridgeClient, PutEventsCommand } = require("@aws-sdk/client-eventbridge");'
+    );
+    imports.push("const eventbridge = new EventBridgeClient({});");
+  }
+  if (writesKinesis) {
+    imports.push(
+      'const { KinesisClient, PutRecordCommand } = require("@aws-sdk/client-kinesis");'
+    );
+    imports.push("const kinesis = new KinesisClient({});");
+  }
+
+  // ---- GET branch: graph-aware read path ----
+  const getBranch = hasDynamo
+    ? `    if (httpMethod === "GET") {
       const scanResult = await dynamodb.send(
         new ScanCommand({
           TableName: process.env.TABLE_NAME,
@@ -67,8 +158,39 @@ exports.handler = async (event) => {
           items: scanResult.Items || []
         })
       };
-    }
+    }`
+    : writesS3
+      ? `    if (httpMethod === "GET") {
+      const listResult = await s3.send(
+        new ListObjectsV2Command({
+          Bucket: process.env.BUCKET_NAME,
+          MaxKeys: 50
+        })
+      );
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          count: (listResult.Contents || []).length,
+          items: listResult.Contents || []
+        })
+      };
+    }`
+      : `    if (httpMethod === "GET") {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          service: "${functionName}",
+          message: "Service is live. No datastore is bound to this function."
+        })
+      };
+    }`;
 
+  const deleteBranch = hasDynamo
+    ? `
     if (httpMethod === "DELETE") {
       const queryKey = event.queryStringParameters && event.queryStringParameters["${partitionKey}"];
       let bodyKey = null;
@@ -97,7 +219,169 @@ exports.handler = async (event) => {
           })
         };
       }
-    }
+    }`
+    : "";
+
+  // ---- persistence / fanout actions (only for lambda -> X edges) ----
+  const recordKeyLine = hasDynamo
+    ? `      ["${partitionKey}"]: body["${partitionKey}"] || randomUUID(),`
+    : "";
+
+  const actionBlocks = [];
+  if (hasDynamo) {
+    actionBlocks.push(`    await dynamodb.send(
+      new PutCommand({
+        TableName: process.env.TABLE_NAME,
+        Item: record
+      })
+    );`);
+  }
+  if (writesS3) {
+    actionBlocks.push(`    if (process.env.BUCKET_NAME) {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.BUCKET_NAME,
+          Key: "uploads/" + (record["${partitionKey}"] || randomUUID()) + ".json",
+          Body: JSON.stringify(record),
+          ContentType: "application/json"
+        })
+      );
+      record._s3Key = "uploads/" + (record["${partitionKey}"] || randomUUID()) + ".json";
+    }`);
+  }
+  if (sendsSqs) {
+    actionBlocks.push(`    if (process.env.QUEUE_URL) {
+      await sqs.send(
+        new SendMessageCommand({
+          QueueUrl: process.env.QUEUE_URL,
+          MessageBody: JSON.stringify(record)
+        })
+      );
+    }`);
+  }
+  if (publishesSns) {
+    actionBlocks.push(`    if (process.env.TOPIC_ARN) {
+      await sns.send(
+        new PublishCommand({
+          TopicArn: process.env.TOPIC_ARN,
+          Message: JSON.stringify(record)
+        })
+      );
+    }`);
+  }
+  if (putsEventBridge) {
+    actionBlocks.push(`    if (process.env.EVENT_BUS_NAME) {
+      await eventbridge.send(
+        new PutEventsCommand({
+          Entries: [
+            {
+              EventBusName: process.env.EVENT_BUS_NAME,
+              Source: "${functionName}",
+              DetailType: "RecordCreated",
+              Detail: JSON.stringify(record)
+            }
+          ]
+        })
+      );
+    }`);
+  }
+  if (writesKinesis) {
+    actionBlocks.push(`    if (process.env.STREAM_NAME) {
+      await kinesis.send(
+        new PutRecordCommand({
+          StreamName: process.env.STREAM_NAME,
+          Data: JSON.stringify(record),
+          PartitionKey: String(record["${partitionKey}"] || randomUUID())
+        })
+      );
+    }`);
+  }
+
+  // ---- event path (present only when a trigger edge exists) ----
+  const eventHandling = hasTrigger
+    ? `
+  if (!httpMethod) {
+    return handleEvent(event);
+  }`
+    : `
+  if (!httpMethod) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ success: false, error: "Unsupported event source" })
+    };
+  }`;
+
+  const handleEventFn = hasTrigger
+    ? `
+async function handleEvent(event) {
+  console.log("[NapkinCloud] Event received:", JSON.stringify(event).slice(0, 2000));
+  const records = (event && event.Records) || [];
+  const payloadCount = records.length || 1;
+
+  // Generated by NapkinCloud
+  // Function: ${functionName}
+  // Logic: ${logic}
+
+  try {
+${hasDynamo
+      ? `    for (const incoming of records) {
+      let payload = incoming;
+      if (typeof incoming.body === "string") {
+        try {
+          payload = JSON.parse(incoming.body);
+        } catch (_) {
+          payload = { raw: incoming.body };
+        }
+      } else if (incoming.body && typeof incoming.body === "object") {
+        payload = incoming.body;
+      }
+      const item = {
+        ...payload,
+        ["${partitionKey}"]: payload["${partitionKey}"] || randomUUID(),
+        receivedAt: new Date().toISOString()
+      };
+      await dynamodb.send(
+        new PutCommand({
+          TableName: process.env.TABLE_NAME,
+          Item: item
+        })
+      );
+    }`
+      : ""}
+    console.log("[NapkinCloud] Processed " + payloadCount + " event record(s)");
+    return { processed: payloadCount };
+  } catch (error) {
+    console.error("[NapkinCloud] Event processing failed:", error);
+    throw error;
+  }
+}
+`
+    : "";
+
+  return `${imports.join("\n")}
+
+exports.handler = async (event) => {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key",
+    "Access-Control-Allow-Methods": "*"
+  };
+
+  const httpMethod = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || "").toUpperCase();
+${eventHandling}
+
+  if (httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: ""
+    };
+  }
+
+  try {
+${getBranch}
+${deleteBranch}
 
     const body =
       JSON.parse(event.body || "{}");
@@ -106,73 +390,14 @@ exports.handler = async (event) => {
     // Function: ${functionName}
     // Logic: ${logic}
 
-    const pkValue = body["${partitionKey}"] || randomUUID();
-    const now = new Date().toISOString();
-
     const record = {
       ...body,
-      ["${partitionKey}"]: pkValue,
-      createdAt: now,
-      updatedAt: now
+${recordKeyLine}
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
-    ${hasDynamoDB ? `await dynamodb.send(
-      new PutCommand({
-        TableName: process.env.TABLE_NAME,
-        Item: record
-      })
-    );` : ""}
-
-    ${hasS3 ? `if (process.env.BUCKET_NAME) {
-      try {
-        await s3.send(new PutObjectCommand({
-          Bucket: process.env.BUCKET_NAME,
-          Key: "uploads/" + pkValue + ".json",
-          Body: JSON.stringify(record),
-          ContentType: "application/json"
-        }));
-        record._s3Key = "uploads/" + pkValue + ".json";
-      } catch (s3Err) {
-        console.warn("[NapkinCloud] S3 write warning:", s3Err.message);
-      }
-    }` : ""}
-
-    ${hasSQS ? `if (process.env.QUEUE_URL) {
-      try {
-        await sqs.send(new SendMessageCommand({
-          QueueUrl: process.env.QUEUE_URL,
-          MessageBody: JSON.stringify(record)
-        }));
-      } catch (sqsErr) {
-        console.warn("[NapkinCloud] SQS send warning:", sqsErr.message);
-      }
-    }` : ""}
-
-    ${hasSNS ? `if (process.env.TOPIC_ARN) {
-      try {
-        await sns.send(new PublishCommand({
-          TopicArn: process.env.TOPIC_ARN,
-          Message: JSON.stringify(record)
-        }));
-      } catch (snsErr) {
-        console.warn("[NapkinCloud] SNS publish warning:", snsErr.message);
-      }
-    }` : ""}
-
-    ${hasEventBridge ? `if (process.env.EVENT_BUS_NAME) {
-      try {
-        await eventbridge.send(new PutEventsCommand({
-          Entries: [{
-            EventBusName: process.env.EVENT_BUS_NAME,
-            Source: "napkincloud.app",
-            DetailType: "RecordCreated",
-            Detail: JSON.stringify(record)
-          }]
-        }));
-      } catch (ebErr) {
-        console.warn("[NapkinCloud] EventBridge warning:", ebErr.message);
-      }
-    }` : ""}
+${actionBlocks.join("\n\n")}
 
     return {
       statusCode: 201,
@@ -195,7 +420,7 @@ exports.handler = async (event) => {
     };
   }
 };
-`;
+${handleEventFn}`;
 }
 
 module.exports = {
