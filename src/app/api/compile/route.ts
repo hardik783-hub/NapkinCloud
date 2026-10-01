@@ -28,6 +28,10 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
+        // The deployment backend could not be reached, so the compile/deploy
+        // outcome is UNKNOWN — not a failure. The canvas must not render
+        // FAILED badges (or fake a CREATE_COMPLETE) from this synthetic body.
+        unverified: true,
         projectId: 'error',
         timestamp: new Date().toISOString(),
         validation: {

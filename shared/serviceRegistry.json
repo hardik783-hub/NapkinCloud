@@ -85,7 +85,7 @@
       "canTriggerLambda": false,
       "requiresIncoming": true,
       "defaults": { "tableName": "DataTable", "primaryKey": "id" },
-      "outputKeys": ["TableName", "OrdersTableName"],
+      "outputKeys": ["TableName"],
       "samKind": "AWS::DynamoDB::Table",
       "lambdaEnvVar": "TABLE_NAME",
       "lambdaPolicy": { "template": "DynamoDBCrudPolicy", "argName": "TableName", "argSource": "Ref" }

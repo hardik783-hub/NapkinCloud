@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:backend": "node backend/src/compiler/test-validator.js && node backend/src/compiler/test-generator.js && node backend/src/compiler/test-lambda-generator.js && node backend/src/compiler/test-compiler.js",
-    "test:frontend": "node --experimental-strip-types scripts/test-generator-multiservice.ts && node --experimental-strip-types scripts/test-validator-parity.ts && node --experimental-strip-types scripts/test-edges-semantics.ts",
+    "test:frontend": "node --experimental-strip-types scripts/test-generator-multiservice.ts && node --experimental-strip-types scripts/test-validator-parity.ts && node --experimental-strip-types scripts/test-edges-semantics.ts && node --experimental-strip-types scripts/test-compile-outcome.ts",
     "test:e2e": "node --experimental-strip-types scripts/verify-e2e.ts",
     "test": "npm run test:backend && npm run test:frontend && npm run test:e2e"
   },

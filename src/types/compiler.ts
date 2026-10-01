@@ -72,7 +72,7 @@ export interface TeammateArchitecture {
 export interface CompileOutputs {
   ApiUrl?: string;
   LambdaFunctionName?: string;
-  /** DynamoDB table (generic key; OrdersTableName kept as legacy alias). */
+  /** DynamoDB table (generic key — the only DynamoDB output emitted). */
   TableName?: string;
   BucketName?: string;
   QueueUrl?: string;
@@ -83,7 +83,11 @@ export interface CompileOutputs {
   StreamName?: string;
   StateMachineArn?: string;
   SecretArn?: string;
-  /** Legacy key emitted for backward compatibility when a table exists. */
+  /**
+   * @deprecated Stale Orders-era alias — no longer emitted by the registry
+   * output definition. Kept only so responses from older deployments can
+   * still be read.
+   */
   OrdersTableName?: string;
   [key: string]: string | undefined;
 }
@@ -120,6 +124,13 @@ export interface CompileResponse {
   stackName?: string;
   status?: string;
   message?: string;
+
+  /**
+   * Set by the /api/compile proxy when the deployment backend could not be
+   * reached. The compile/deploy outcome is UNKNOWN (not a failure) — the
+   * canvas must fall back to a neutral status rather than rendering FAILED.
+   */
+  unverified?: boolean;
 
   handOffContract?: {
     projectId: string;

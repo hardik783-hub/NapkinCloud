@@ -32,6 +32,7 @@ import DynamoDbDrawer from './drawers/DynamoDbDrawer';
 import Toast from './Toast';
 import type { AppNode, AppEdge, NodeStatus, ApiGatewayNodeData, DynamoDbNodeData } from '@/types/canvas';
 import type { CompileResponse, ServiceReasoning } from '@/types/compiler';
+import { classifyCompileOutcome, nodeStatusForOutcome } from '@/lib/compileOutcome';
 
 const initialNodes: AppNode[] = [
   {
@@ -343,6 +344,14 @@ const handleJumpToLive = useCallback(() => {
   setDeployedTableName(null);
   setAllNodeStatuses('compiling');
 
+  // The backend's response is the ONLY authority on deployment failure.
+  // A dropped connection / proxy timeout / non-JSON body leaves the outcome
+  // UNCONFIRMED: nodes then fall back to the neutral default state instead
+  // of falsely claiming FAILED — and LIVE/CREATE_COMPLETE is only ever
+  // applied from an actual success response.
+  let body: CompileResponse | null = null;
+  let fetchError: unknown = null;
+
   try {
     const res = await fetch('/api/compile', {
       method: 'POST',
@@ -350,43 +359,62 @@ const handleJumpToLive = useCallback(() => {
       body: JSON.stringify({ nodes, edges, source: genSource }),
     });
 
-    const data: CompileResponse = await res.json();
-
-    if (!res.ok || !data.success) {
-      const errorMsg =
-        data.validation?.errors?.filter(Boolean).join('\n') ||
-        (data as any).error ||
-        'Compilation failed.';
-      throw new Error(errorMsg);
+    try {
+      body = (await res.json()) as CompileResponse;
+    } catch (parseErr) {
+      console.warn('⚠️ Compile response was not JSON — deployment status unconfirmed:', parseErr);
+      body = null;
     }
+  } catch (err) {
+    fetchError = err;
+  }
 
-    setCompilationResult(data);
-    console.log('[DEBUG COMPILE OUTPUTS]', data.outputs);
-    setAllNodeStatuses('deploying');
+  const outcome = classifyCompileOutcome({ body, fetchError });
 
-    // Use REAL AWS deployment outputs (generic keys, legacy alias as fallback)
-    const liveUrl = data.outputs?.ApiUrl;
-    const lambdaName = data.outputs?.LambdaFunctionName;
-    const tableName = (data.outputs?.TableName || data.outputs?.OrdersTableName)?.trim() || null;
-    setDeployedTableName(tableName);
-    console.log('[DEBUG DEPLOYED TABLE]', tableName);
+  try {
+    if (outcome.kind === 'success') {
+      // Authoritative success — use the actual response status/outputs.
+      // (classifyCompileOutcome only reports success for a parsed JSON body.)
+      const data = body as CompileResponse;
+      setCompilationResult(data);
+      console.log('[DEBUG COMPILE OUTPUTS]', data.outputs);
+      setAllNodeStatuses('deploying');
 
-    setAllNodeStatuses('live', {
-      liveUrl,
-      lambdaArn: lambdaName,
-      liveTableName: tableName || undefined,
-    });
+      // Use REAL AWS deployment outputs (generic keys, legacy alias as fallback)
+      const liveUrl = data.outputs?.ApiUrl;
+      const lambdaName = data.outputs?.LambdaFunctionName;
+      const tableName = (data.outputs?.TableName || data.outputs?.OrdersTableName)?.trim() || null;
+      setDeployedTableName(tableName);
+      console.log('[DEBUG DEPLOYED TABLE]', tableName);
 
-    setIsLive(true);
+      setAllNodeStatuses('live', {
+        liveUrl,
+        lambdaArn: lambdaName,
+        liveTableName: tableName || undefined,
+      });
 
-  } catch (err: any) {
-    console.error('❌ Compile failed:', err);
+      setIsLive(true);
+      setToast({
+        message: `🟢 ${outcome.message || 'Architecture deployed successfully'}${outcome.status ? ` — ${outcome.status}` : ''}`,
+        type: 'success',
+      });
+    } else if (outcome.kind === 'rejected') {
+      // Authoritative backend rejection (validation/compile/deploy error).
+      console.error('❌ Compile failed:', outcome.message);
 
-    setToast({ message: `AWS Deployment Failed: ${err.message}`, type: 'error' });
+      setToast({ message: `AWS Deployment Failed: ${outcome.message}`, type: 'error' });
 
-    setAllNodeStatuses('failed');
-    setIsLive(false);
+      setAllNodeStatuses(nodeStatusForOutcome(outcome));
+      setIsLive(false);
+    } else {
+      // Unconfirmed: neutral state — never falsely claim deployment failure.
+      console.warn('⚠️ Compile outcome unconfirmed:', outcome.message);
 
+      setToast({ message: outcome.message, type: 'warning' });
+
+      setAllNodeStatuses(nodeStatusForOutcome(outcome));
+      setIsLive(false);
+    }
   } finally {
     setIsCompiling(false);
   }

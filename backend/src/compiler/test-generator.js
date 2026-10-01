@@ -53,8 +53,12 @@ assert(
 );
 assert(Boolean(template.Outputs && template.Outputs.ApiUrl), "exports ApiUrl output");
 assert(
-  Boolean(template.Outputs.TableName) && Boolean(template.Outputs.OrdersTableName),
-  "exports generic TableName plus legacy OrdersTableName alias when a table exists"
+  Boolean(template.Outputs.TableName),
+  "exports generic TableName output when a table exists"
+);
+assert(
+  template.Outputs.OrdersTableName === undefined,
+  "stale OrdersTableName output is no longer emitted"
 );
 
 // Hard-coded Orders logical IDs are gone — IDs derive from node ids.
@@ -227,6 +231,11 @@ for (const outputKey of [
 ]) {
   assert(Boolean(imageTemplate.Outputs[outputKey]), `image pipeline exports ${outputKey}`);
 }
+assert(
+  imageTemplate.Outputs.TableName !== undefined &&
+    imageTemplate.Outputs.OrdersTableName === undefined,
+  "image pipeline exports generic TableName but NOT the stale OrdersTableName"
+);
 
 const imageLambdaProps = imageTemplate.Resources.NodeLambda1.Properties;
 assert(
