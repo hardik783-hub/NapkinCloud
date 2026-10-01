@@ -185,9 +185,26 @@ async function runE2ETestSuite() {
     'Build an image-processing pipeline. Users upload images to S3, Lambda processes them, metadata is stored in DynamoDB, failures go to SQS, and CloudWatch monitors it.'
   );
   const imgTypes = imgResult.canvasNodes.map((n) => String(n.type));
-  for (const t of ['api_gateway', 'lambda', 's3', 'dynamodb', 'sqs', 'cloudwatch']) {
+  for (const t of ['s3', 'lambda', 'dynamodb', 'sqs', 'cloudwatch']) {
     assert(imgTypes.includes(t), `Image pipeline graph includes ${t}`);
   }
+  assert(
+    !imgTypes.includes('api_gateway'),
+    'Image pipeline graph has NO API Gateway (S3 upload triggers Lambda)'
+  );
+  const imgEdgeKind = (from: string, to: string): string | undefined => {
+    const edge = imgResult.canvasEdges.find((e) => {
+      const s = imgResult.canvasNodes.find((n) => n.id === e.source);
+      const t = imgResult.canvasNodes.find((n) => n.id === e.target);
+      return String(s?.type) === from && String(t?.type) === to;
+    });
+    return edge ? ((edge.data as { kind?: string } | undefined)?.kind ?? 'flow') : undefined;
+  };
+  assert(imgEdgeKind('s3', 'lambda') === 'triggers', 'S3 -> Lambda kind is triggers');
+  assert(imgEdgeKind('lambda', 's3') === undefined, 'No Lambda -> S3 edge exists');
+  assert(imgEdgeKind('lambda', 'dynamodb') === 'writes', 'Lambda -> DynamoDB kind is writes');
+  assert(imgEdgeKind('lambda', 'sqs') === 'fails-to', 'Lambda -> SQS kind is fails-to');
+  assert(imgEdgeKind('lambda', 'cloudwatch') === 'monitors', 'Lambda -> CloudWatch kind is monitors');
   const imgValidation = validateGraphTopology(imgResult.canvasNodes, imgResult.canvasEdges);
   assert(imgValidation.valid === true, 'Image pipeline topology is valid');
   const imgExport = exportGraphToJson(

@@ -151,6 +151,7 @@ const apiOnly = validateGraph({
 assert(apiOnly.valid === false, "API + Lambda with no downstream service rejected");
 
 // 5. Multi-service image pipeline graph is valid (canonical regression graph)
+//    Legacy API-shaped variant: API -> Lambda, lambda -> X everywhere.
 const imagePipeline = validateGraph({
   nodes: [
     { id: "node-api-1", type: "api_gateway" },
@@ -175,6 +176,27 @@ assert(
     imagePipeline.roles.queues.length === 1 &&
     imagePipeline.roles.monitors.length === 1,
   "role map classifies stores/queues/monitors correctly"
+);
+
+// 6. Canonical image pipeline: S3 -> Lambda [triggers] with NO API Gateway
+const canonicalImagePipeline = validateGraph({
+  nodes: [
+    { id: "node-s3-1", type: "s3" },
+    { id: "node-lambda-1", type: "lambda" },
+    { id: "node-dynamodb-1", type: "dynamodb" },
+    { id: "node-sqs-1", type: "sqs" },
+    { id: "node-cloudwatch-1", type: "cloudwatch" },
+  ],
+  edges: [
+    { source: "node-s3-1", target: "node-lambda-1", data: { kind: "triggers" } },
+    { source: "node-lambda-1", target: "node-dynamodb-1", data: { kind: "writes" } },
+    { source: "node-lambda-1", target: "node-sqs-1", data: { kind: "fails-to" } },
+    { source: "node-lambda-1", target: "node-cloudwatch-1", data: { kind: "monitors" } },
+  ],
+});
+assert(
+  canonicalImagePipeline.valid === true,
+  "canonical image pipeline (S3 -> Lambda [triggers], no API Gateway) accepted"
 );
 
 if (failed > 0) {

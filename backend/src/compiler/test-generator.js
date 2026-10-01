@@ -147,10 +147,13 @@ assert(
 
 // ---------------------------------------------------------------------------
 // 4. Image pipeline golden (Section G #10)
+// Canonical semantics: S3 -> Lambda [triggers] (NO API Gateway),
+// lambda -> dynamodb [writes], lambda -> sqs [fails-to],
+// lambda -> cloudwatch [monitors].
 // ---------------------------------------------------------------------------
 const imageGraph = {
   nodes: [
-    { id: "node-api-1", type: "api_gateway", data: { method: "POST", path: "/images" } },
+    { id: "node-s3-1", type: "s3", data: { resourceName: "image-uploads" } },
     {
       id: "node-lambda-1",
       type: "lambda",
@@ -159,7 +162,6 @@ const imageGraph = {
         businessLogic: "Processes uploaded images and persists metadata",
       },
     },
-    { id: "node-s3-1", type: "s3", data: { resourceName: "image-uploads" } },
     {
       id: "node-dynamodb-1",
       type: "dynamodb",
@@ -169,8 +171,7 @@ const imageGraph = {
     { id: "node-cloudwatch-1", type: "cloudwatch", data: { resourceName: "image-alarm" } },
   ],
   edges: [
-    { source: "node-api-1", target: "node-lambda-1", data: { kind: "invokes" } },
-    { source: "node-lambda-1", target: "node-s3-1", data: { kind: "writes" } },
+    { source: "node-s3-1", target: "node-lambda-1", data: { kind: "triggers" } },
     { source: "node-lambda-1", target: "node-dynamodb-1", data: { kind: "writes" } },
     { source: "node-lambda-1", target: "node-sqs-1", data: { kind: "fails-to" } },
     { source: "node-lambda-1", target: "node-cloudwatch-1", data: { kind: "monitors" } },
@@ -180,7 +181,6 @@ const imageGraph = {
 const imageTemplate = generateSamTemplate(imageGraph);
 const imageTypes = resourceTypes(imageTemplate);
 for (const required of [
-  "AWS::Serverless::Api",
   "AWS::Serverless::Function",
   "AWS::S3::Bucket",
   "AWS::DynamoDB::Table",
@@ -189,17 +189,36 @@ for (const required of [
 ]) {
   assert(imageTypes.includes(required), `image pipeline template contains ${required}`);
 }
+assert(
+  !imageTypes.includes("AWS::Serverless::Api"),
+  "image pipeline has NO API Gateway resource (event-triggered graph)"
+);
+assert(!imageTemplate.Outputs.ApiUrl, "image pipeline exports no ApiUrl (no API node)");
 
 const imageResourceIds = Object.keys(imageTemplate.Resources);
 assert(
-  ["NodeApi1", "NodeLambda1", "NodeS31", "NodeDynamodb1", "NodeSqs1", "NodeCloudwatch1"].every(
+  ["NodeS31", "NodeLambda1", "NodeDynamodb1", "NodeSqs1", "NodeCloudwatch1"].every(
     (id) => imageResourceIds.includes(id)
   ),
   `image pipeline logical IDs derive from node ids (${imageResourceIds.join(", ")})`
 );
 
+// Requirement 6: S3 -> Lambda must emit an S3 Lambda event trigger.
+const imageEvents = imageTemplate.Resources.NodeLambda1.Properties.Events;
+assert(Boolean(imageEvents.NodeS31Trigger), "S3 -> Lambda emits an S3 trigger event source");
+assert(
+  imageEvents.NodeS31Trigger &&
+    imageEvents.NodeS31Trigger.Type === "S3" &&
+    JSON.stringify(imageEvents.NodeS31Trigger.Properties.Bucket) === JSON.stringify({ Ref: "NodeS31" }) &&
+    imageEvents.NodeS31Trigger.Properties.Events === "s3:ObjectCreated:*",
+  "S3 trigger binds the graph's bucket (Ref NodeS31) with s3:ObjectCreated:*"
+);
+assert(
+  !imageEvents.ApiEvent,
+  "image pipeline Lambda has NO ApiEvent (no API Gateway -> Lambda edge)"
+);
+
 for (const outputKey of [
-  "ApiUrl",
   "LambdaFunctionName",
   "BucketName",
   "TableName",
@@ -212,20 +231,24 @@ for (const outputKey of [
 const imageLambdaProps = imageTemplate.Resources.NodeLambda1.Properties;
 assert(
   Boolean(imageLambdaProps.Environment.Variables.TABLE_NAME) &&
-    Boolean(imageLambdaProps.Environment.Variables.BUCKET_NAME) &&
-    Boolean(imageLambdaProps.Environment.Variables.QUEUE_URL) &&
+    !imageLambdaProps.Environment.Variables.BUCKET_NAME &&
+    !imageLambdaProps.Environment.Variables.QUEUE_URL &&
     !imageLambdaProps.Environment.Variables.TOPIC_ARN,
-  "image pipeline Lambda env vars derived from edges (no SNS wiring for an SNS-less graph)"
+  "image pipeline env vars: TABLE_NAME only — no BUCKET_NAME (S3 is the trigger, not a target) and no QUEUE_URL (fails-to is not a send path)"
 );
 assert(
   JSON.stringify(imageLambdaProps.Policies).includes("DynamoDBCrudPolicy") &&
-    JSON.stringify(imageLambdaProps.Policies).includes("S3CrudPolicy") &&
-    JSON.stringify(imageLambdaProps.Policies).includes("SQSSendMessagePolicy"),
-  "image pipeline IAM policies derived from lambda -> X edges"
+    !JSON.stringify(imageLambdaProps.Policies).includes("S3CrudPolicy") &&
+    !JSON.stringify(imageLambdaProps.Policies).includes("SQSSendMessagePolicy"),
+  "image pipeline IAM policies: DynamoDB write only — no S3 write, no SQS send (fails-to edge)"
 );
+// Requirement 9: the failure-sink edge becomes a dead-letter destination,
+// never a normal send path.
 assert(
-  imageLambdaProps.Events.ApiEvent.Properties.Path === "/images",
-  "API event path derives from the api_gateway node"
+  imageLambdaProps.DeadLetterConfig &&
+    JSON.stringify(imageLambdaProps.DeadLetterConfig.TargetArn) ===
+      JSON.stringify({ "Fn::GetAtt": ["NodeSqs1", "Arn"] }),
+  "lambda -> sqs [fails-to] wires the queue as the Lambda DeadLetterConfig (failure sink)"
 );
 assert(
   !JSON.stringify(imageTemplate).includes('"OrdersApi"') &&
@@ -237,6 +260,7 @@ assert(
 // YAML serialization works (golden artifact)
 const yamlText = yaml.dump(imageTemplate, { noRefs: true });
 assert(yamlText.includes("AWS::CloudWatch::Alarm"), "image pipeline template serializes to YAML");
+assert(yamlText.includes("ObjectCreated"), "YAML keeps the S3 ObjectCreated trigger");
 
 // ---------------------------------------------------------------------------
 // 5. Event-triggered graph WITHOUT API Gateway (approved policy)

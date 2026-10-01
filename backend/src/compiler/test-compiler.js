@@ -59,22 +59,23 @@ assert(threw, "invalid graph rejects compilation with an exception");
 
 // ---------------------------------------------------------------------------
 // Image pipeline — full compile (offline; the deployer is never invoked)
+// Canonical semantics: S3 -> Lambda [triggers] (no API Gateway),
+// lambda -> dynamodb [writes], lambda -> sqs [fails-to],
+// lambda -> cloudwatch [monitors].
 // ---------------------------------------------------------------------------
 const imageGraph = {
   nodes: [
-    { id: "node-api-1", type: "api_gateway", data: { method: "POST", path: "/images" } },
+    { id: "node-s3-1", type: "s3", data: { resourceName: "image-uploads" } },
     { id: "node-lambda-1", type: "lambda", data: {
       functionName: "ProcessImageFunction",
       businessLogic: "Processes uploaded images and persists metadata",
     } },
-    { id: "node-s3-1", type: "s3", data: { resourceName: "image-uploads" } },
     { id: "node-dynamodb-1", type: "dynamodb", data: { tableName: "ImageMetadataTable", primaryKey: "imageId" } },
     { id: "node-sqs-1", type: "sqs", data: { resourceName: "image-failures" } },
     { id: "node-cloudwatch-1", type: "cloudwatch", data: { resourceName: "image-alarm" } },
   ],
   edges: [
-    { source: "node-api-1", target: "node-lambda-1", data: { kind: "invokes" } },
-    { source: "node-lambda-1", target: "node-s3-1", data: { kind: "writes" } },
+    { source: "node-s3-1", target: "node-lambda-1", data: { kind: "triggers" } },
     { source: "node-lambda-1", target: "node-dynamodb-1", data: { kind: "writes" } },
     { source: "node-lambda-1", target: "node-sqs-1", data: { kind: "fails-to" } },
     { source: "node-lambda-1", target: "node-cloudwatch-1", data: { kind: "monitors" } },
@@ -85,7 +86,6 @@ try {
   const img = compileArchitecture(imageGraph);
   assert(img.success === true, "image pipeline compiles successfully");
   for (const marker of [
-    "AWS::Serverless::Api",
     "AWS::Serverless::Function",
     "AWS::S3::Bucket",
     "AWS::DynamoDB::Table",
@@ -95,10 +95,33 @@ try {
     assert(img.templateYaml.includes(marker), `image pipeline template contains ${marker}`);
   }
   assert(
+    !img.templateYaml.includes("AWS::Serverless::Api"),
+    "image pipeline template has NO API Gateway (S3 triggers Lambda directly)"
+  );
+  assert(
+    img.templateYaml.includes("NodeS31Trigger") && img.templateYaml.includes("ObjectCreated"),
+    "S3 -> Lambda compiles to an S3 ObjectCreated event trigger"
+  );
+  assert(
+    img.templateYaml.includes("DeadLetterConfig"),
+    "lambda -> sqs [fails-to] compiles to a DeadLetterConfig (not a send path)"
+  );
+  assert(
+    !img.templateYaml.includes("SQSSendMessagePolicy") &&
+      !img.templateYaml.includes("QUEUE_URL"),
+    "failure-sink edge grants NO SQS send policy / QUEUE_URL"
+  );
+  assert(
     !img.templateYaml.includes("OrdersApi:") &&
       !img.templateYaml.includes("CreateOrderFunction") &&
       !img.templateYaml.includes("  OrdersTable:"),
     "image pipeline template has no hard-coded Orders identifiers"
+  );
+  assert(
+    img.handlerJs.includes("async function handleEvent") &&
+      !img.handlerJs.includes("SendMessageCommand") &&
+      !img.handlerJs.includes("S3Client"),
+    "image handler consumes S3 events (handleEvent) with no SQS send / S3 write path"
   );
   try {
     new vm.Script(img.handlerJs, { filename: "index.js" });

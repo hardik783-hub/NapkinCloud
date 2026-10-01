@@ -78,22 +78,22 @@ assertParses(s3Code, "S3-only graph");
 
 // ---------------------------------------------------------------------------
 // 3. Image pipeline graph — imports/actions derived from edges
+// Canonical: S3 -> Lambda [triggers] (no API), lambda -> dynamodb [writes],
+// lambda -> sqs [fails-to], lambda -> cloudwatch [monitors].
 // ---------------------------------------------------------------------------
 const imageGraph = {
   nodes: [
-    { id: "node-api-1", type: "api_gateway", data: { method: "POST", path: "/images" } },
+    { id: "node-s3-1", type: "s3", data: { resourceName: "image-uploads" } },
     { id: "node-lambda-1", type: "lambda", data: {
       functionName: "ProcessImageFunction",
       businessLogic: "Processes uploaded images\nand persists metadata",
     } },
-    { id: "node-s3-1", type: "s3", data: { resourceName: "image-uploads" } },
     { id: "node-dynamodb-1", type: "dynamodb", data: { tableName: "ImageMetadataTable", primaryKey: "imageId" } },
     { id: "node-sqs-1", type: "sqs", data: { resourceName: "image-failures" } },
     { id: "node-cloudwatch-1", type: "cloudwatch", data: { resourceName: "image-alarm" } },
   ],
   edges: [
-    { source: "node-api-1", target: "node-lambda-1", data: { kind: "invokes" } },
-    { source: "node-lambda-1", target: "node-s3-1", data: { kind: "writes" } },
+    { source: "node-s3-1", target: "node-lambda-1", data: { kind: "triggers" } },
     { source: "node-lambda-1", target: "node-dynamodb-1", data: { kind: "writes" } },
     { source: "node-lambda-1", target: "node-sqs-1", data: { kind: "fails-to" } },
     { source: "node-lambda-1", target: "node-cloudwatch-1", data: { kind: "monitors" } },
@@ -101,9 +101,15 @@ const imageGraph = {
 };
 
 const imageCode = generateLambdaCode(imageGraph);
-assert(imageCode.includes("DynamoDBDocumentClient"), "image handler imports DynamoDB (lambda -> dynamodb)");
-assert(imageCode.includes("S3Client"), "image handler imports S3 (lambda -> s3)");
-assert(imageCode.includes("SQSClient"), "image handler imports SQS (lambda -> sqs)");
+assert(imageCode.includes("DynamoDBDocumentClient"), "image handler imports DynamoDB (lambda -> dynamodb writes)");
+assert(imageCode.includes("async function handleEvent"),
+  "S3 -> Lambda trigger adds an event-processing path (handleEvent)");
+assert(!imageCode.includes("S3Client"),
+  "image handler has NO S3 client — S3 is the trigger source, not a write target");
+assert(!imageCode.includes("SQSClient") && !imageCode.includes("SendMessageCommand"),
+  "image handler has NO SQS send path — lambda -> sqs [fails-to] is a failure sink");
+assert(imageCode.includes("dead-letter queue"),
+  "failure-sink semantics preserved via DeadLetterConfig note in the handler");
 assert(!imageCode.includes("SNSClient"), "image handler has NO SNS import (no sns node)");
 assert(!imageCode.includes("EventBridgeClient"), "image handler has NO EventBridge import (no eventbridge node)");
 assert(imageCode.includes('"imageId"'), "image handler uses the graph's partition key (imageId)");

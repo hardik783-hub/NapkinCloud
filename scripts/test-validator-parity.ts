@@ -47,21 +47,19 @@ const ordersGraph: Fixture = {
 };
 
 const imagePipelineGraph: Fixture = {
-  name: 'valid image pipeline (6 services)',
+  name: 'valid image pipeline (5 services, S3 triggers Lambda, no API Gateway)',
   nodes: [
-    { id: 'node-api-1', type: 'api_gateway', position: { x: 0, y: 0 }, data: { label: 'API Gateway', method: 'POST', path: '/images', status: 'draft' } } as AppNode,
+    { id: 'node-s3-1', type: 's3', position: { x: 0, y: 0 }, data: { label: 'AWS S3 Bucket', serviceType: 's3', resourceName: 'image-uploads', status: 'draft' } } as AppNode,
     { id: 'node-lambda-1', type: 'lambda', position: { x: 1, y: 0 }, data: { label: 'Lambda', functionName: 'ProcessImageFunction', runtime: 'nodejs20.x', businessLogic: 'Processes images', status: 'draft' } } as AppNode,
-    { id: 'node-s3-1', type: 's3', position: { x: 2, y: 0 }, data: { label: 'AWS S3 Bucket', serviceType: 's3', resourceName: 'image-uploads', status: 'draft' } } as AppNode,
-    { id: 'node-dynamodb-1', type: 'dynamodb', position: { x: 3, y: 0 }, data: { label: 'DynamoDB', tableName: 'ImageMetadataTable', primaryKey: 'imageId', status: 'draft' } } as AppNode,
-    { id: 'node-sqs-1', type: 'sqs', position: { x: 4, y: 0 }, data: { label: 'AWS SQS Queue', serviceType: 'sqs', resourceName: 'image-failures', status: 'draft' } } as AppNode,
-    { id: 'node-cloudwatch-1', type: 'cloudwatch', position: { x: 5, y: 0 }, data: { label: 'CloudWatch', serviceType: 'cloudwatch', resourceName: 'image-alarm', status: 'draft' } } as AppNode,
+    { id: 'node-dynamodb-1', type: 'dynamodb', position: { x: 2, y: 0 }, data: { label: 'DynamoDB', tableName: 'ImageMetadataTable', primaryKey: 'imageId', status: 'draft' } } as AppNode,
+    { id: 'node-sqs-1', type: 'sqs', position: { x: 3, y: 0 }, data: { label: 'AWS SQS Queue', serviceType: 'sqs', resourceName: 'image-failures', status: 'draft' } } as AppNode,
+    { id: 'node-cloudwatch-1', type: 'cloudwatch', position: { x: 4, y: 0 }, data: { label: 'CloudWatch', serviceType: 'cloudwatch', resourceName: 'image-alarm', status: 'draft' } } as AppNode,
   ],
   edges: [
-    { id: 'e1', source: 'node-api-1', target: 'node-lambda-1' },
-    { id: 'e2', source: 'node-lambda-1', target: 'node-s3-1' },
-    { id: 'e3', source: 'node-lambda-1', target: 'node-dynamodb-1' },
-    { id: 'e4', source: 'node-lambda-1', target: 'node-sqs-1' },
-    { id: 'e5', source: 'node-lambda-1', target: 'node-cloudwatch-1' },
+    { id: 'e1', source: 'node-s3-1', target: 'node-lambda-1', data: { kind: 'triggers' } },
+    { id: 'e2', source: 'node-lambda-1', target: 'node-dynamodb-1', data: { kind: 'writes' } },
+    { id: 'e3', source: 'node-lambda-1', target: 'node-sqs-1', data: { kind: 'fails-to' } },
+    { id: 'e4', source: 'node-lambda-1', target: 'node-cloudwatch-1', data: { kind: 'monitors' } },
   ] as AppEdge[],
 };
 

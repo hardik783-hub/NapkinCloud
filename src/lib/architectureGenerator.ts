@@ -244,11 +244,22 @@ export function defaultConnections(nodes: GraphSpecNode[]): GraphSpecConnection[
   const apiIdx = nodes.findIndex((n) => n.type === 'api_gateway');
   const lambdaIdx = nodes.findIndex((n) => n.type === 'lambda');
   const connections: GraphSpecConnection[] = [];
+  const triggerToLambda = new Set<number>();
   if (apiIdx >= 0 && lambdaIdx >= 0) {
     connections.push({ from: apiIdx, to: lambdaIdx, kind: 'invokes' });
+  } else if (lambdaIdx >= 0) {
+    // Event-triggered pipeline (no API Gateway): the first trigger-capable
+    // source drives the Lambda — e.g. S3 -> Lambda [triggers].
+    const triggerIdx = nodes.findIndex(
+      (n, i) => i !== lambdaIdx && SERVICE_REGISTRY.services[n.type]?.canTriggerLambda
+    );
+    if (triggerIdx >= 0) {
+      connections.push({ from: triggerIdx, to: lambdaIdx, kind: 'triggers' });
+      triggerToLambda.add(triggerIdx);
+    }
   }
   nodes.forEach((n, i) => {
-    if (i === apiIdx || i === lambdaIdx || lambdaIdx < 0) return;
+    if (i === apiIdx || i === lambdaIdx || lambdaIdx < 0 || triggerToLambda.has(i)) return;
     if (n.type === 'cognito') {
       connections.push({ from: i, to: lambdaIdx, kind: 'triggers' });
     } else if (n.type === 'cloudwatch') {
@@ -370,6 +381,10 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
   let tableName = 'OrdersTable';
   let primaryKey = 'orderId';
   let domainService: 'dynamodb' | 's3' = 'dynamodb';
+  // Event-triggered pipelines (image processing) have NO API Gateway:
+  // the event source triggers the Lambda directly. API Gateway stays
+  // OPTIONAL — it is never added just to satisfy an old 3-node pattern.
+  let eventTriggered = false;
 
   if (
     (p.includes('image') || p.includes('photo')) &&
@@ -377,13 +392,14 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
   ) {
     appName = 'Image Processing Pipeline';
     appDesc =
-      'Serverless pipeline that processes uploaded images and records processing metadata';
+      'Event-driven pipeline that processes images uploaded to S3 and records processing metadata';
     path = '/images';
     functionName = 'ProcessImageFunction';
     businessLogic =
-      'Validates uploaded image metadata, processes the image, and persists results';
+      'Processes uploaded image events, extracts metadata, and persists results; failures route to the dead-letter queue';
     tableName = 'ImageMetadataTable';
     primaryKey = 'imageId';
+    eventTriggered = true;
   } else if (
     p.includes('s3') ||
     p.includes('file') ||
@@ -484,12 +500,25 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
   // ALL detected services are included — no precedence collapse. If the
   // prompt names no service explicitly, fall back to the domain default.
   const detected = detectServices(p);
-  const services = detected.length > 0 ? detected : [domainService];
+  const services = [...(detected.length > 0 ? detected : [domainService])];
 
-  const nodes: GraphSpecNode[] = [
-    { type: 'api_gateway', method, path },
-    { type: 'lambda', functionName, businessLogic },
-  ];
+  // Event-triggered pipeline: lead with the event source (S3) and skip the
+  // API Gateway node entirely, so the graph reads: S3 -> Lambda [triggers].
+  // If no trigger-capable source was detected, keep the API so the graph
+  // still satisfies the canonical trigger rule (R8).
+  const triggerSourceIdx = services.findIndex(
+    (t) => SERVICE_REGISTRY.services[t]?.canTriggerLambda
+  );
+  const includeApi = !eventTriggered || triggerSourceIdx < 0;
+
+  const nodes: GraphSpecNode[] = [];
+  if (includeApi) {
+    nodes.push({ type: 'api_gateway', method, path });
+  } else {
+    nodes.push({ type: services[triggerSourceIdx] });
+    services.splice(triggerSourceIdx, 1);
+  }
+  nodes.push({ type: 'lambda', functionName, businessLogic });
   for (const type of services) {
     const node: GraphSpecNode = { type };
     if (type === 'dynamodb') {
@@ -502,17 +531,46 @@ function fallbackGenerate(prompt: string): GeneratedArchitectureResponse {
   const connections = defaultConnections(nodes);
 
   // "failures go to SQS" semantics: mark lambda -> sqs as a failure sink.
+  // A failure sink is NOT a normal send path (see samGenerator/lambdaGenerator).
   if (/\bfail|failures?|dead[- ]?letter|dlq\b/.test(p)) {
     for (const conn of connections) {
       if (nodes[conn.to]?.type === 'sqs') conn.kind = 'fails-to';
     }
   }
 
+  // Reasoning metadata for the event-driven image pipeline — mirrors the
+  // exact edge semantics (triggers / writes / fails-to / monitors).
+  const imageReasoning: ServiceReasoning[] | undefined = eventTriggered
+    ? [
+        {
+          service: 's3',
+          reason: `Upload bucket: new objects (s3:ObjectCreated:*) automatically trigger ${functionName} — no API Gateway in the path.`,
+        },
+        {
+          service: 'lambda',
+          reason: `Event-driven compute: ${functionName} runs on every S3 upload (S3 -> Lambda [triggers]), stores metadata, and routes failures to the dead-letter queue.`,
+        },
+        {
+          service: 'dynamodb',
+          reason: `Stores image metadata in ${tableName} partitioned by ${primaryKey} (Lambda -> DynamoDB [writes]).`,
+        },
+        {
+          service: 'sqs',
+          reason: `Dead-letter queue for processing failures (Lambda -> SQS [fails-to]) — a failure sink, not a normal send path.`,
+        },
+        {
+          service: 'cloudwatch',
+          reason: 'CloudWatch alarm on Lambda errors for operational monitoring (Lambda -> CloudWatch [monitors]).',
+        },
+      ]
+    : undefined;
+
   const spec: GraphSpec = {
     application: { name: appName, description: appDesc },
     nodes,
     connections,
     source: 'offline_rule_engine',
+    reasoning: imageReasoning,
   };
 
   return makeResponse(spec, buildGraphFromSpec(spec), prompt);

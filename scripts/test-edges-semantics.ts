@@ -5,6 +5,11 @@
  * source mapping, while lambda -> sqs (Lambda WRITES/FAILS-TO the queue)
  * must compile to IAM send policy + QUEUE_URL env — and never an event
  * source. Edge direction, not node presence, decides the wiring.
+ *
+ * Image pipeline (canonical): S3 -> Lambda [triggers] must compile to an
+ * S3 ObjectCreated event trigger with NO API Gateway, and
+ * lambda -> sqs [fails-to] must NOT become a normal send path
+ * (no SQSSendMessagePolicy / QUEUE_URL) — it wires the DeadLetterConfig.
  */
 import { createRequire } from 'node:module';
 import { inferEdgeKind } from '../src/lib/serviceRegistry.ts';
@@ -53,6 +58,50 @@ const sinkGraph = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Graph C: image pipeline — S3 -> Lambda [triggers], lambda -> dynamodb
+// [writes], lambda -> sqs [fails-to], lambda -> cloudwatch [monitors]
+// ---------------------------------------------------------------------------
+const imageGraph = {
+  nodes: [
+    { id: 'node-s3-1', type: 's3', data: { resourceName: 'image-uploads' } },
+    { id: 'node-lambda-1', type: 'lambda', data: { functionName: 'ProcessImageFunction' } },
+    {
+      id: 'node-dynamodb-1',
+      type: 'dynamodb',
+      data: { tableName: 'ImageMetadataTable', primaryKey: 'imageId' },
+    },
+    { id: 'node-sqs-1', type: 'sqs', data: { resourceName: 'image-failures' } },
+    { id: 'node-cloudwatch-1', type: 'cloudwatch', data: { resourceName: 'image-alarm' } },
+  ],
+  edges: [
+    {
+      id: 'e1',
+      source: 'node-s3-1',
+      target: 'node-lambda-1',
+      data: { kind: inferEdgeKind('s3', 'lambda', 'triggers') },
+    },
+    {
+      id: 'e2',
+      source: 'node-lambda-1',
+      target: 'node-dynamodb-1',
+      data: { kind: inferEdgeKind('lambda', 'dynamodb') },
+    },
+    {
+      id: 'e3',
+      source: 'node-lambda-1',
+      target: 'node-sqs-1',
+      data: { kind: inferEdgeKind('lambda', 'sqs', 'fails-to') },
+    },
+    {
+      id: 'e4',
+      source: 'node-lambda-1',
+      target: 'node-cloudwatch-1',
+      data: { kind: inferEdgeKind('lambda', 'cloudwatch') },
+    },
+  ],
+};
+
 function lambdaProps(template: any) {
   return Object.values(template.Resources).find(
     (r: any) => r.Type === 'AWS::Serverless::Function'
@@ -74,9 +123,11 @@ function main() {
 
   const triggerTemplate = generateSamTemplate(triggerGraph);
   const sinkTemplate = generateSamTemplate(sinkGraph);
+  const imageTemplate = generateSamTemplate(imageGraph);
 
   const triggerProps = lambdaProps(triggerTemplate);
   const sinkProps = lambdaProps(sinkTemplate);
+  const imageProps = lambdaProps(imageTemplate);
 
   // Graph A: SQS event source mapping, no send policy
   const triggerEventsJson = JSON.stringify(triggerProps.Events);
@@ -111,6 +162,38 @@ function main() {
   const sinkTypes = Object.values(sinkTemplate.Resources).map((r: any) => r.Type);
   assert(!triggerTypes.includes('AWS::Serverless::Api'), 'A (sqs -> lambda): no API Gateway resource');
   assert(sinkTypes.includes('AWS::Serverless::Api'), 'B (api -> lambda -> sqs): API Gateway resource present');
+
+  // Graph C: canonical image pipeline semantics
+  const imageEvents = JSON.stringify(imageProps.Events);
+  assert(
+    imageEvents.includes('"S3"') && imageEvents.includes('ObjectCreated') &&
+      imageEvents.includes('Ref') ,
+    'C (s3 -> lambda): S3 ObjectCreated event trigger wired'
+  );
+  assert(
+    !imageEvents.includes('ApiEvent'),
+    'C (image pipeline): no ApiEvent — API Gateway stays optional'
+  );
+  assert(
+    !Object.values(imageTemplate.Resources).map((r: any) => r.Type).includes('AWS::Serverless::Api'),
+    'C (image pipeline): no API Gateway resource emitted'
+  );
+  assert(
+    JSON.stringify(imageProps.Policies).includes('DynamoDBCrudPolicy'),
+    'C (lambda -> dynamodb [writes]): DynamoDBCrudPolicy wired'
+  );
+  assert(
+    !JSON.stringify(imageProps.Policies).includes('SQSSendMessagePolicy') &&
+      !imageProps.Environment.Variables.QUEUE_URL &&
+      !JSON.stringify(imageProps.Policies).includes('S3CrudPolicy') &&
+      !imageProps.Environment.Variables.BUCKET_NAME,
+    'C (fails-to / trigger edges): NO SQS send policy, NO QUEUE_URL, NO S3 write path'
+  );
+  assert(
+    imageProps.DeadLetterConfig &&
+      JSON.stringify(imageProps.DeadLetterConfig.TargetArn).includes('NodeSqs1'),
+    'C (lambda -> sqs [fails-to]): queue wired as DeadLetterConfig (failure sink)'
+  );
 
   if (failed > 0) {
     console.error(`\n❌ test-edges-semantics: ${failed} assertion(s) failed`);

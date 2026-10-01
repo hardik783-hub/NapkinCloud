@@ -13,6 +13,7 @@ const {
   validateGraph,
   SERVICE_REGISTRY,
   nodeData,
+  inferEdgeKind,
 } = require("../../../shared/graphRules");
 
 function toLogicalId(nodeId) {
@@ -225,7 +226,8 @@ function generateSamTemplate(graph) {
   // ---------------------------------------------------------------
   let apiEvent = null; // { node }
   const triggerSources = []; // event-source nodes with edge -> lambda
-  const actionTargets = []; // nodes with edge lambda -> node
+  const actionTargets = []; // nodes with edge lambda -> node (normal send path)
+  const failureSinks = []; // lambda -> node edges with kind "fails-to" (DLQ only)
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
 
   for (const edge of edges) {
@@ -241,7 +243,19 @@ function generateSamTemplate(graph) {
         if (def && def.lambdaEvent) triggerSources.push({ node: source, def });
       }
     } else if (source.id === lambda.id && target.type !== "lambda") {
-      actionTargets.push({ node: target });
+      const kind = inferEdgeKind(
+        source.type,
+        target.type,
+        edge.data && edge.data.kind
+      );
+      if (kind === "fails-to") {
+        // Failure sink (e.g. lambda -> sqs [fails-to]): NOT a normal send
+        // path — no SQSSendMessagePolicy / QUEUE_URL. Wired as the
+        // function's dead-letter destination below.
+        failureSinks.push({ node: target });
+      } else {
+        actionTargets.push({ node: target });
+      }
     }
   }
 
@@ -303,6 +317,17 @@ function generateSamTemplate(graph) {
       Events: events,
     },
   };
+
+  // Failure sinks (kind "fails-to") become the function's dead-letter
+  // destination instead of an IAM send path.
+  const dlqSink = failureSinks.find(
+    ({ node }) => node.type === "sqs" || node.type === "sns"
+  );
+  if (dlqSink) {
+    template.Resources[lambdaLogical].Properties.DeadLetterConfig = {
+      TargetArn: { "Fn::GetAtt": [logical.get(dlqSink.node.id), "Arn"] },
+    };
+  }
 
   // ---------------------------------------------------------------
   // 4. Monitoring (CloudWatch alarm node watches the Lambda)

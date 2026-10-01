@@ -4,8 +4,10 @@
  * Runs fully offline (Bedrock credentials are stripped from the environment
  * so the deterministic rule engine is exercised — no network calls).
  *
- *   1. Image-processing prompt must yield API Gateway, Lambda, S3,
- *      DynamoDB, SQS, CloudWatch with correct edges/semantics.
+ *   1. Image-processing prompt must yield S3, Lambda, DynamoDB, SQS,
+ *      CloudWatch (NO API Gateway) with correct edge directions:
+ *      S3 -> Lambda [triggers], lambda -> dynamodb [writes],
+ *      lambda -> sqs [fails-to], lambda -> cloudwatch [monitors].
  *   2. architecture.nodes must always derive from canvasNodes (the
  *      canvas-vs-teammate contradiction regression).
  *   3. The 8 preset prompts + image prompt fall within loose node bounds.
@@ -62,16 +64,19 @@ async function main() {
 
   const types = img.canvasNodes.map((n) => String(n.type));
   for (const required of [
-    'api_gateway',
-    'lambda',
     's3',
+    'lambda',
     'dynamodb',
     'sqs',
     'cloudwatch',
   ]) {
     assert(types.includes(required), `image graph contains ${required}`);
   }
-  assert(types.length === 6, `image graph has exactly 6 nodes (got ${types.length})`);
+  assert(
+    !types.includes('api_gateway'),
+    'image graph has NO api_gateway (event-triggered pipeline — API stays optional)'
+  );
+  assert(types.length === 5, `image graph has exactly 5 nodes (got ${types.length})`);
 
   // Edges well-formed
   const nodeIds = new Set(img.canvasNodes.map((n) => n.id));
@@ -80,7 +85,9 @@ async function main() {
   );
   assert(edgesWellFormed, 'all edges reference existing, distinct nodes');
 
-  // Required edges with semantics (per spec: api->lambda; lambda->s3/ddb/sqs/cw)
+  // Required edges with semantics — canonical image pipeline:
+  // S3 -> Lambda [triggers], lambda -> dynamodb [writes],
+  // lambda -> sqs [fails-to], lambda -> cloudwatch [monitors]
   const edgeKind = (from: string, to: string): string | undefined => {
     const edge = img.canvasEdges.find((e) => {
       const s = img.canvasNodes.find((n) => n.id === e.source);
@@ -89,12 +96,13 @@ async function main() {
     });
     return edge ? ((edge.data as { kind?: string } | undefined)?.kind ?? 'flow') : undefined;
   };
-  assert(edgeKind('api_gateway', 'lambda') === 'invokes', 'api_gateway -> lambda kind = invokes');
-  assert(edgeKind('lambda', 's3') === 'writes', 'lambda -> s3 kind = writes');
+  assert(edgeKind('s3', 'lambda') === 'triggers', 's3 -> lambda kind = triggers (upload triggers processing)');
+  assert(edgeKind('lambda', 's3') === undefined, 'NO lambda -> s3 edge (S3 is the trigger source, not a write target)');
+  assert(edgeKind('api_gateway', 'lambda') === undefined, 'NO api_gateway -> lambda edge (no API node at all)');
   assert(edgeKind('lambda', 'dynamodb') === 'writes', 'lambda -> dynamodb kind = writes');
   assert(edgeKind('lambda', 'sqs') === 'fails-to', 'lambda -> sqs kind = fails-to (failure sink)');
   assert(edgeKind('lambda', 'cloudwatch') === 'monitors', 'lambda -> cloudwatch kind = monitors');
-  assert(img.canvasEdges.length === 5, `image graph has 5 edges (got ${img.canvasEdges.length})`);
+  assert(img.canvasEdges.length === 4, `image graph has 4 edges (got ${img.canvasEdges.length})`);
 
   // Teammate schema derives from canvas (regression: they used to contradict)
   assert(
@@ -111,6 +119,22 @@ async function main() {
     'reasoning has one entry per node'
   );
 
+  // Reasoning metadata mirrors the edge semantics (Section G #2)
+  const reasonFor = (svc: string) =>
+    img.reasoning.find((r) => r.service === svc)?.reason || '';
+  assert(
+    /trigger/i.test(reasonFor('s3')) && /ObjectCreated/i.test(reasonFor('s3')),
+    's3 reasoning documents the S3 -> Lambda trigger'
+  );
+  assert(
+    /dead-letter/i.test(reasonFor('sqs')) && /fails-to/i.test(reasonFor('sqs')),
+    'sqs reasoning documents the failure sink (fails-to), not a send path'
+  );
+  assert(
+    /writes/i.test(reasonFor('dynamodb')) && /monitors/i.test(reasonFor('cloudwatch')),
+    'dynamodb/cloudwatch reasoning documents writes/monitors semantics'
+  );
+
   // Frontend validator accepts it
   const verdict = validateGraphTopology(img.canvasNodes, img.canvasEdges);
   assert(verdict.valid === true, `image graph passes topology validation (${verdict.errors.join('; ') || 'clean'})`);
@@ -124,8 +148,8 @@ async function main() {
     'exported JSON node/edge counts exactly match the canvas graph'
   );
   assert(
-    exported.validation.nodeCount === 6 && exported.validation.edgeCount === 5,
-    'export validation reports 6 nodes / 5 edges'
+    exported.validation.nodeCount === 5 && exported.validation.edgeCount === 4,
+    'export validation reports 5 nodes / 4 edges'
   );
 
   // ------------------------------------------------------------------
