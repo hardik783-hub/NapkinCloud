@@ -59,7 +59,7 @@ export default function DynamoDbDrawer({
     fetchRecords();
   }, [fetchRecords, refreshTrigger]);
 
-  const pkName = dbData.primaryKey || 'orderId';
+  const pkName = dbData.primaryKey || 'id';
 
   return (
     <div className="fixed right-0 top-14 bottom-0 z-40 w-full max-w-xl bg-[#0A0A0A]/98 backdrop-blur-2xl border-l border-[#222222] shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-200 select-none">

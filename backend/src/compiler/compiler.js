@@ -21,10 +21,8 @@ function compileArchitecture(graph) {
 
   console.log("✅ Architecture valid");
 
-  // STEP 2 — Find nodes
+  // STEP 2 — Find nodes (the graph itself is the single source of truth)
   const lambdaNode = graph.nodes.find((node) => node.type === "lambda");
-
-  const databaseNode = graph.nodes.find((node) => node.type === "dynamodb");
 
   if (!lambdaNode) {
     throw new Error("Architecture must contain a Lambda node");
@@ -50,10 +48,10 @@ function compileArchitecture(graph) {
 
   console.log("✅ SAM template generated");
 
-  // STEP 4 — Generate Lambda
+  // STEP 4 — Generate Lambda (graph-driven: imports/actions derive from edges)
   console.log("⚙️ Generating Lambda code...");
 
-  const lambdaCode = generateLambdaCode(lambdaNode, databaseNode, graph.nodes);
+  const lambdaCode = generateLambdaCode(graph);
 
   const lambdaDir = path.join(infrastructureDir, "functions", "generated");
 

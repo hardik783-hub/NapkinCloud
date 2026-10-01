@@ -14,8 +14,8 @@ interface ApiTesterDrawerProps {
 
 export default function ApiTesterDrawer({
   apiData,
-  tableName = 'OrdersTable',
-  primaryKey = 'orderId',
+  tableName = 'DataTable',
+  primaryKey = 'id',
   onClose,
   onRequestSuccess,
 }: ApiTesterDrawerProps) {

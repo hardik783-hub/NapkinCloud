@@ -68,10 +68,17 @@ async function runE2ETestSuite() {
   assert(validEdges.length === 2, 'Canvas contains 2 directed edges');
 
   // Step 2 & 3: Compilation and Topology Validation
-  console.log('\n[Step 2/9] Validating Graph Topology against P0 Contract...');
+  console.log('\n[Step 2/9] Validating Graph Topology against canonical rules...');
   const validation = validateGraphTopology(validNodes, validEdges);
-  assert(validation.valid === true, 'Valid P0 pipeline accepted');
-  assert(Boolean(validation.nodes?.api && validation.nodes?.lambda && validation.nodes?.dynamodb), 'Extracted API, Lambda, and DynamoDB nodes');
+  assert(validation.valid === true, 'Valid API -> Lambda -> DynamoDB pipeline accepted');
+  const roles = validation.roles!;
+  const apiNode = roles.entries.find((n) => n.type === 'api_gateway');
+  const lambdaNode = roles.compute.find((n) => n.type === 'lambda');
+  const dynamoNode = roles.stores.find((n) => n.type === 'dynamodb');
+  assert(
+    Boolean(apiNode && lambdaNode && dynamoNode),
+    'Role map extracts API, Lambda, and DynamoDB nodes (no type lie)'
+  );
 
   // Negative Validation Check
   const invalidEdges: AppEdge[] = [{ id: 'e1', source: 'node-api-1', target: 'node-dynamodb-1' }];
@@ -80,7 +87,11 @@ async function runE2ETestSuite() {
 
   // Step 4: Intent Normalization
   console.log('\n[Step 3/9] Normalizing Intent via Bedrock / Deterministic Engine...');
-  const normArch = await normalizeIntentWithBedrock(validation.nodes!);
+  const normArch = await normalizeIntentWithBedrock({
+    api: apiNode!,
+    lambda: lambdaNode!,
+    dynamodb: dynamoNode!,
+  });
   assert(normArch.pattern === 'api_lambda_dynamodb', 'Architecture pattern is api_lambda_dynamodb');
   assert(normArch.api.method === 'POST', 'HTTP method normalized to POST');
   assert(normArch.api.path === '/orders', 'Route path normalized to /orders');
@@ -156,9 +167,59 @@ async function runE2ETestSuite() {
   assert(genResult.reasoning?.length === 3, 'Generated Hardik Schema #3 reasoning entries for all services');
 
   const exportedGraph = exportGraphToJson(genResult.canvasNodes, genResult.canvasEdges, 'proj-test', genResult.reasoning);
-  assert(exportedGraph.validation.isValidP0 === true, 'Exported graph satisfies strict P0 topology');
+  assert(exportedGraph.validation.isValidP0 === true, 'Exported graph satisfies canonical topology');
   assert(Boolean(exportedGraph.application?.name), 'Exported graph contains application metadata');
-  assert(Boolean(exportedGraph.reasoning && exportedGraph.reasoning.length === 3), 'Exported graph contains 3-service reasoning breakdown');
+  assert(
+    Boolean(exportedGraph.reasoning && exportedGraph.reasoning.length === 3),
+    'Exported graph contains 3-service reasoning breakdown'
+  );
+  assert(
+    exportedGraph.nodes.length === genResult.canvasNodes.length &&
+      exportedGraph.edges.length === genResult.canvasEdges.length,
+    'Export JSON exactly reflects the canvas graph (node/edge counts)'
+  );
+
+  // Step 11: Image-pipeline multi-service regression (Section G #10, generate+validate+export leg)
+  console.log('\n[Step 11/11] Image-pipeline multi-service regression...');
+  const imgResult = await generateArchitectureFromPrompt(
+    'Build an image-processing pipeline. Users upload images to S3, Lambda processes them, metadata is stored in DynamoDB, failures go to SQS, and CloudWatch monitors it.'
+  );
+  const imgTypes = imgResult.canvasNodes.map((n) => String(n.type));
+  for (const t of ['s3', 'lambda', 'dynamodb', 'sqs', 'cloudwatch']) {
+    assert(imgTypes.includes(t), `Image pipeline graph includes ${t}`);
+  }
+  assert(
+    !imgTypes.includes('api_gateway'),
+    'Image pipeline graph has NO API Gateway (S3 upload triggers Lambda)'
+  );
+  const imgEdgeKind = (from: string, to: string): string | undefined => {
+    const edge = imgResult.canvasEdges.find((e) => {
+      const s = imgResult.canvasNodes.find((n) => n.id === e.source);
+      const t = imgResult.canvasNodes.find((n) => n.id === e.target);
+      return String(s?.type) === from && String(t?.type) === to;
+    });
+    return edge ? ((edge.data as { kind?: string } | undefined)?.kind ?? 'flow') : undefined;
+  };
+  assert(imgEdgeKind('s3', 'lambda') === 'triggers', 'S3 -> Lambda kind is triggers');
+  assert(imgEdgeKind('lambda', 's3') === undefined, 'No Lambda -> S3 edge exists');
+  assert(imgEdgeKind('lambda', 'dynamodb') === 'writes', 'Lambda -> DynamoDB kind is writes');
+  assert(imgEdgeKind('lambda', 'sqs') === 'fails-to', 'Lambda -> SQS kind is fails-to');
+  assert(imgEdgeKind('lambda', 'cloudwatch') === 'monitors', 'Lambda -> CloudWatch kind is monitors');
+  const imgValidation = validateGraphTopology(imgResult.canvasNodes, imgResult.canvasEdges);
+  assert(imgValidation.valid === true, 'Image pipeline topology is valid');
+  const imgExport = exportGraphToJson(
+    imgResult.canvasNodes,
+    imgResult.canvasEdges,
+    'proj-test',
+    imgResult.reasoning
+  );
+  assert(imgExport.validation.isValidP0 === true, 'Image pipeline export valid (no DynamoDB-only mandate)');
+  assert(
+    imgExport.nodes.length === imgResult.canvasNodes.length &&
+      imgExport.edges.length === imgResult.canvasEdges.length &&
+      imgExport.architecture.nodes.every((n, i) => n.id === imgResult.canvasNodes[i].id),
+    'Image pipeline export JSON exactly reflects the canvas graph'
+  );
 
   console.log('\n====================================================');
   console.log('🎉 ALL DEFINITION OF DONE & PHASE 5 TESTS PASSED!');

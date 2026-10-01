@@ -34,7 +34,7 @@ export default function TopBar({
   const [exportedData, setExportedData] = useState<ExportedGraph | null>(null);
 
   const handleOpenJsonModal = () => {
-    const data = exportGraphToJson(nodes, edges, 'proj-demo-orders', reasoning);
+    const data = exportGraphToJson(nodes, edges, 'proj-canvas', reasoning);
     setExportedData(data);
     setJsonModalOpen(true);
   };
@@ -105,13 +105,15 @@ export default function TopBar({
                 validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
               }`}
             />
-            <span className="text-neutral-400">P0 Topology:</span>
+            <span className="text-neutral-400">Topology:</span>
             <span
               className={`font-semibold ${
                 validation.isValidP0 ? 'text-emerald-400' : 'text-amber-400'
               }`}
             >
-              {validation.isValidP0 ? 'Ready for AWS' : 'Needs Connections'}
+              {validation.isValidP0
+                ? `Valid (${validation.nodeCount} services)`
+                : 'Needs Connections'}
             </span>
           </div>
         )}
@@ -197,7 +199,9 @@ export default function TopBar({
               <span>
                 Status:{' '}
                 {exportedData.validation.isValidP0
-                  ? '✓ Valid P0 Pipeline (API -> Lambda -> DynamoDB)'
+                  ? `✓ Valid graph (${exportedData.architecture.nodes
+                      .map((n) => n.type)
+                      .join(' → ')})`
                   : `⚠️ ${exportedData.validation.errors.join(', ')}`}
               </span>
               <span className="text-[11px] opacity-75">

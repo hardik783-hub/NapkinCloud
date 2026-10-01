@@ -106,6 +106,7 @@ function CanvasInner() {
   const [refreshDbTrigger, setRefreshDbTrigger] = useState(0);
   const [reasoning, setReasoning] = useState<ServiceReasoning[] | undefined>(undefined);
   const [application, setApplication] = useState<{ name: string; description: string } | undefined>(undefined);
+  const [genSource, setGenSource] = useState<'bedrock' | 'offline_rule_engine' | undefined>(undefined);
   const [showExplainer, setShowExplainer] = useState(false);
 
   const { screenToFlowPosition, fitView } = useReactFlow();
@@ -115,13 +116,15 @@ function CanvasInner() {
       newNodes: AppNode[],
       newEdges: AppEdge[],
       newReasoning: ServiceReasoning[],
-      appData: { name: string; description: string }
+      appData: { name: string; description: string },
+      source?: 'bedrock' | 'offline_rule_engine'
     ) => {
       idCounter = 2;
       setNodes(newNodes);
       setEdges(newEdges);
       setReasoning(newReasoning);
       setApplication(appData);
+      setGenSource(source);
       setShowExplainer(true);
       setIsLive(false);
       setCompilationResult(null);
@@ -194,6 +197,7 @@ function CanvasInner() {
     setActiveDrawer('none');
     setCompilationResult(null);
     setDeployedTableName(null);
+    setGenSource(undefined);
   }, [setEdges, setNodes]);
    
 const handleJumpToLive = useCallback(() => {
@@ -343,7 +347,7 @@ const handleJumpToLive = useCallback(() => {
     const res = await fetch('/api/compile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nodes, edges }),
+      body: JSON.stringify({ nodes, edges, source: genSource }),
     });
 
     const data: CompileResponse = await res.json();
@@ -360,12 +364,12 @@ const handleJumpToLive = useCallback(() => {
     console.log('[DEBUG COMPILE OUTPUTS]', data.outputs);
     setAllNodeStatuses('deploying');
 
-    // Use REAL AWS deployment outputs
+    // Use REAL AWS deployment outputs (generic keys, legacy alias as fallback)
     const liveUrl = data.outputs?.ApiUrl;
     const lambdaName = data.outputs?.LambdaFunctionName;
-    const tableName = data.outputs?.OrdersTableName?.trim() || null;
+    const tableName = (data.outputs?.TableName || data.outputs?.OrdersTableName)?.trim() || null;
     setDeployedTableName(tableName);
-    console.log('[DEBUG DEPLOYED TABLE]', data.outputs?.OrdersTableName);
+    console.log('[DEBUG DEPLOYED TABLE]', tableName);
 
     setAllNodeStatuses('live', {
       liveUrl,
@@ -485,8 +489,8 @@ const handleJumpToLive = useCallback(() => {
       {activeDrawer === 'api' && apiNode && (
         <ApiTesterDrawer
           apiData={apiNode.data as ApiGatewayNodeData}
-          tableName={(dynamoNode?.data as DynamoDbNodeData)?.tableName || 'OrdersTable'}
-          primaryKey={(dynamoNode?.data as DynamoDbNodeData)?.primaryKey || 'orderId'}
+          tableName={(dynamoNode?.data as DynamoDbNodeData)?.tableName}
+          primaryKey={(dynamoNode?.data as DynamoDbNodeData)?.primaryKey || 'id'}
           onClose={() => setActiveDrawer('none')}
           onRequestSuccess={handleRequestSuccess}
         />

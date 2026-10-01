@@ -1,7 +1,9 @@
 import type { AppNode, AppEdge, HttpMethod } from './canvas';
+import type { GraphRoles, GraphSummary } from '../../shared/graphRules.js';
 
 export interface NormalizedArchitecture {
-  pattern: 'api_lambda_dynamodb';
+  /** Free-form pattern label — historical values include 'api_lambda_dynamodb'. */
+  pattern: string;
   api: {
     method: HttpMethod;
     path: string;
@@ -21,24 +23,28 @@ export interface NormalizedArchitecture {
   source: 'bedrock' | 'deterministic_fallback';
 }
 
+/**
+ * Topology validation verdict. Node extraction is expressed as a role map
+ * (entries/compute/stores/queues/…) derived from the canonical service
+ * registry — there is no hard-coded `nodes.dynamodb` slot anymore.
+ */
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
-  nodes?: {
-    api: AppNode;
-    lambda: AppNode;
-    dynamodb: AppNode;
-  };
+  roles?: GraphRoles;
+  summary?: GraphSummary;
 }
 
 export interface CompileRequest {
   projectId?: string;
   nodes: AppNode[];
   edges: AppEdge[];
+  /** When true the backend compiles artifacts but performs NO AWS deployment. */
+  dryRun?: boolean;
 }
 
 export interface ServiceReasoning {
-  service: 'api_gateway' | 'lambda' | 'dynamodb' | string;
+  service: string;
   reason: string;
 }
 
@@ -56,9 +62,30 @@ export interface TeammateArchitecture {
     connections: Array<{
       from: string;
       to: string;
+      kind?: string;
     }>;
   };
   reasoning: ServiceReasoning[];
+}
+
+/** Generic deployment outputs — keyed by resource role, not by project name. */
+export interface CompileOutputs {
+  ApiUrl?: string;
+  LambdaFunctionName?: string;
+  /** DynamoDB table (generic key; OrdersTableName kept as legacy alias). */
+  TableName?: string;
+  BucketName?: string;
+  QueueUrl?: string;
+  TopicArn?: string;
+  EventBusName?: string;
+  UserPoolId?: string;
+  AlarmName?: string;
+  StreamName?: string;
+  StateMachineArn?: string;
+  SecretArn?: string;
+  /** Legacy key emitted for backward compatibility when a table exists. */
+  OrdersTableName?: string;
+  [key: string]: string | undefined;
 }
 
 export interface CompileResponse {
@@ -69,21 +96,26 @@ export interface CompileResponse {
   templateYaml?: string;
   handlerJs?: string;
 
+  /** How the architecture was authored (passed through when known). */
+  source?: 'bedrock' | 'offline_rule_engine' | 'user_canvas';
+
   normalizedArchitecture?: NormalizedArchitecture;
   reasoning?: ServiceReasoning[];
   teammateArchitecture?: TeammateArchitecture;
+
+  /** Canonical graph summary the artifacts were generated from. */
+  graph?: GraphSummary & {
+    roles?: string[];
+    api?: { method: string; path: string };
+    lambda?: string;
+  };
 
   validation: {
     valid: boolean;
     errors: string[];
   };
 
-  outputs?: {
-    ApiUrl?: string;
-    OrdersTableName?: string;
-    LambdaFunctionName?: string;
-    [key: string]: string | undefined;
-  };
+  outputs?: CompileOutputs;
 
   stackName?: string;
   status?: string;
@@ -95,4 +127,3 @@ export interface CompileResponse {
     handlerJs: string;
   };
 }
-

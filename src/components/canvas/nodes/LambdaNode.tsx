@@ -117,7 +117,7 @@ function LambdaNodeComponent({ id, data, selected }: NodeProps<LambdaNode>) {
         <div>
           <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
             <span>BUSINESS LOGIC SPEC</span>
-            <span className="text-amber-400/80">Bedrock Normalizer</span>
+            <span className="text-amber-400/80">Editable spec</span>
           </div>
           <textarea
             value={data.businessLogic}
