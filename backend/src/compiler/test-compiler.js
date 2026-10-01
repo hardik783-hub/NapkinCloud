@@ -103,8 +103,10 @@ try {
     "S3 -> Lambda compiles to an S3 ObjectCreated event trigger"
   );
   assert(
-    img.templateYaml.includes("DeadLetterConfig"),
-    "lambda -> sqs [fails-to] compiles to a DeadLetterConfig (not a send path)"
+    img.templateYaml.includes("DeadLetterQueue:") &&
+      img.templateYaml.includes("Type: SQS") &&
+      !img.templateYaml.includes("DeadLetterConfig"),
+    "lambda -> sqs [fails-to] compiles to SAM DeadLetterQueue (not raw DeadLetterConfig, not a send path)"
   );
   assert(
     !img.templateYaml.includes("SQSSendMessagePolicy") &&

@@ -108,8 +108,8 @@ assert(!imageCode.includes("S3Client"),
   "image handler has NO S3 client — S3 is the trigger source, not a write target");
 assert(!imageCode.includes("SQSClient") && !imageCode.includes("SendMessageCommand"),
   "image handler has NO SQS send path — lambda -> sqs [fails-to] is a failure sink");
-assert(imageCode.includes("dead-letter queue"),
-  "failure-sink semantics preserved via DeadLetterConfig note in the handler");
+assert(imageCode.includes("dead-letter queue") && imageCode.includes("DeadLetterQueue"),
+  "failure-sink semantics preserved via DeadLetterQueue note in the handler");
 assert(!imageCode.includes("SNSClient"), "image handler has NO SNS import (no sns node)");
 assert(!imageCode.includes("EventBridgeClient"), "image handler has NO EventBridge import (no eventbridge node)");
 assert(imageCode.includes('"imageId"'), "image handler uses the graph's partition key (imageId)");

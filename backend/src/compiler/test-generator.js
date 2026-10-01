@@ -243,12 +243,20 @@ assert(
   "image pipeline IAM policies: DynamoDB write only — no S3 write, no SQS send (fails-to edge)"
 );
 // Requirement 9: the failure-sink edge becomes a dead-letter destination,
-// never a normal send path.
+// never a normal send path. Regression: raw `DeadLetterConfig` on
+// AWS::Serverless::Function is rejected by CloudFormation
+// ("property DeadLetterConfig not defined for resource of type
+// AWS::Serverless::Function") — SAM requires `DeadLetterQueue` instead.
 assert(
-  imageLambdaProps.DeadLetterConfig &&
-    JSON.stringify(imageLambdaProps.DeadLetterConfig.TargetArn) ===
+  imageLambdaProps.DeadLetterQueue &&
+    imageLambdaProps.DeadLetterQueue.Type === "SQS" &&
+    JSON.stringify(imageLambdaProps.DeadLetterQueue.TargetArn) ===
       JSON.stringify({ "Fn::GetAtt": ["NodeSqs1", "Arn"] }),
-  "lambda -> sqs [fails-to] wires the queue as the Lambda DeadLetterConfig (failure sink)"
+  "lambda -> sqs [fails-to] wires the queue via SAM DeadLetterQueue (Type SQS + TargetArn)"
+);
+assert(
+  !JSON.stringify(imageTemplate.Resources).includes("DeadLetterConfig"),
+  "no raw DeadLetterConfig property on AWS::Serverless::Function (SAM validation regression)"
 );
 assert(
   !JSON.stringify(imageTemplate).includes('"OrdersApi"') &&

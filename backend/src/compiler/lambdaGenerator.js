@@ -314,7 +314,7 @@ function generateLambdaCode(graph) {
   const failureSinkNote = hasFailureSink
     ? [
         "    // Processing failures are delivered to the SQS dead-letter queue",
-        "    // (the function's DeadLetterConfig) - lambda -> sqs [fails-to] is",
+        "    // (the function's DeadLetterQueue) - lambda -> sqs [fails-to] is",
         "    // a failure sink, not a normal send path.",
       ].join("\n")
     : "";

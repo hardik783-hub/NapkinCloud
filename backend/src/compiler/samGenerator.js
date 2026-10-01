@@ -319,12 +319,21 @@ function generateSamTemplate(graph) {
   };
 
   // Failure sinks (kind "fails-to") become the function's dead-letter
-  // destination instead of an IAM send path.
+  // destination instead of an application send path.
+  //
+  // NOTE: AWS::Serverless::Function does NOT accept `DeadLetterConfig` —
+  // CloudFormation rejects it with "property DeadLetterConfig not defined
+  // for resource of type AWS::Serverless::Function". SAM's native equivalent
+  // is `DeadLetterQueue` (Type + TargetArn), which SAM translates into the
+  // underlying Lambda DeadLetterConfig at deploy time and for which SAM
+  // auto-grants sqs:SendMessage / sns:Publish on the execution role so DLQ
+  // delivery works — no QUEUE_URL env, no application send code.
   const dlqSink = failureSinks.find(
     ({ node }) => node.type === "sqs" || node.type === "sns"
   );
   if (dlqSink) {
-    template.Resources[lambdaLogical].Properties.DeadLetterConfig = {
+    template.Resources[lambdaLogical].Properties.DeadLetterQueue = {
+      Type: dlqSink.node.type === "sns" ? "SNS" : "SQS",
       TargetArn: { "Fn::GetAtt": [logical.get(dlqSink.node.id), "Arn"] },
     };
   }

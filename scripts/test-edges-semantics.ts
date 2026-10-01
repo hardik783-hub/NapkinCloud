@@ -9,7 +9,9 @@
  * Image pipeline (canonical): S3 -> Lambda [triggers] must compile to an
  * S3 ObjectCreated event trigger with NO API Gateway, and
  * lambda -> sqs [fails-to] must NOT become a normal send path
- * (no SQSSendMessagePolicy / QUEUE_URL) — it wires the DeadLetterConfig.
+ * (no SQSSendMessagePolicy / QUEUE_URL) — it wires SAM's native
+ * DeadLetterQueue (raw DeadLetterConfig is rejected on
+ * AWS::Serverless::Function by CloudFormation).
  */
 import { createRequire } from 'node:module';
 import { inferEdgeKind } from '../src/lib/serviceRegistry.ts';
@@ -190,9 +192,14 @@ function main() {
     'C (fails-to / trigger edges): NO SQS send policy, NO QUEUE_URL, NO S3 write path'
   );
   assert(
-    imageProps.DeadLetterConfig &&
-      JSON.stringify(imageProps.DeadLetterConfig.TargetArn).includes('NodeSqs1'),
-    'C (lambda -> sqs [fails-to]): queue wired as DeadLetterConfig (failure sink)'
+    imageProps.DeadLetterQueue &&
+      imageProps.DeadLetterQueue.Type === 'SQS' &&
+      JSON.stringify(imageProps.DeadLetterQueue.TargetArn).includes('NodeSqs1'),
+    'C (lambda -> sqs [fails-to]): queue wired as SAM DeadLetterQueue (failure sink)'
+  );
+  assert(
+    !JSON.stringify(imageTemplate.Resources).includes('DeadLetterConfig'),
+    'C: no raw DeadLetterConfig on AWS::Serverless::Function (CloudFormation rejects it)'
   );
 
   if (failed > 0) {
